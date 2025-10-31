@@ -52,7 +52,7 @@ globals:
     initial_value: '2000.0'
 
 interval:
-  - interval: 100ms
+  - interval: 10ms
     then:
       - lambda: |-
           static int counter = 0;
