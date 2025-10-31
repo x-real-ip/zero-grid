@@ -69,6 +69,6 @@ interval:
           int on_steps = (int)(safe_percent * cycle_length / 100.0);
 
           if (counter < on_steps)
-            id(ssr_relay).turn_on();
+            id(ssr_relay_1).turn_on();
           else
-            id(ssr_relay).turn_off();
+            id(ssr_relay_1).turn_off();
