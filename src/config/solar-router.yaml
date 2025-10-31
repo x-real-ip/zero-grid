@@ -1,0 +1,74 @@
+---
+<<: !include common/base.yaml
+<<: !include common/mqtt.yaml
+
+substitutions:
+  device_name: basement-wall-temperature
+  device_comment:
+    "ESP with dallas temperature sensor to measure the coldest place of the wall"
+
+esphome:
+  name: ${device_name}
+  comment: ${device_comment}
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+output:
+  - platform: gpio
+    id: ssr_relay_1
+    pin: 25
+
+sensor:
+  - <<: !include common/sensor/uptime.yaml
+  - <<: !include common/sensor/wifi_signal.yaml
+  - platform: mqtt_subscribe
+    id: grid_returned
+    topic: "dsmr/reading/electricity_currently_returned"
+    unit_of_measurement: "W"
+    internal: true
+
+number:
+  - platform: template
+    name: "Heater Power Level"
+    id: heater_power_level
+    min_value: 0
+    max_value: 100
+    step: 1
+    optimistic: true
+    restore_value: true
+    icon: "mdi:fire"
+
+globals:
+  - id: heater_max_watts
+    type: float
+    restore_value: no
+    initial_value: '2000.0'
+  - id: heater_rated_watts
+    type: float
+    restore_value: no
+    initial_value: '2000.0'
+
+interval:
+  - interval: 100ms
+    then:
+      - lambda: |-
+          static int counter = 0;
+          counter++;
+          const int cycle_length = 10; // 10 * 100ms = 1 second
+          if (counter >= cycle_length) counter = 0;
+
+          // Limit effective power
+          float user_percent = id(heater_power_level).state;
+          float limit_percent = (id(heater_max_watts) / id(heater_rated_watts)) * 100.0;
+          float safe_percent = (user_percent > limit_percent) ? limit_percent : user_percent;
+
+          // Calculate ON time steps
+          int on_steps = (int)(safe_percent * cycle_length / 100.0);
+
+          if (counter < on_steps)
+            id(ssr_relay).turn_on();
+          else
+            id(ssr_relay).turn_off();
