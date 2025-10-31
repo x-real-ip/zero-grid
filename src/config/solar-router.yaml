@@ -3,9 +3,9 @@
 <<: !include common/mqtt.yaml
 
 substitutions:
-  device_name: basement-wall-temperature
+  device_name: solar-router
   device_comment:
-    "ESP with dallas temperature sensor to measure the coldest place of the wall"
+    "Routes surplus solar power to a heating element to heat water or for space heating"
 
 esphome:
   name: ${device_name}
