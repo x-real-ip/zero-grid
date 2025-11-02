@@ -1,74 +1,158 @@
 ---
 <<: !include common/base.yaml
-<<: !include common/mqtt.yaml
+# <<: !include common/mqtt.yaml
 
 substitutions:
-  device_name: solar-router
-  device_comment:
-    "Routes surplus solar power to a heating element to heat water or for space heating"
+  device_name: "solar-router"
+  device_comment: "Routes surplus solar power to a heating element to heat water or for space heating"
 
 esphome:
   name: ${device_name}
   comment: ${device_comment}
+  on_boot:
+    priority: -10
+    then:
+      - lambda: |-
+          // Initialize DAC: set voltage output mode (0–10 V)
+          esphome::i2c::ErrorCode err;
+
+          // Send register address
+          err = id(i2cbus).write(id(dac_addr_reg), &id(dac_voltage_reg), 1, false);
+          if (err != esphome::i2c::ERROR_OK) {
+            ESP_LOGW("dac", "Failed to write DAC register address, I2C error %d", (int)err);
+          }
+
+          // Send output mode data (0–10 V)
+          err = id(i2cbus).write(id(dac_addr_reg), &id(dac_voltage_mode_data), 1);
+          if (err == esphome::i2c::ERROR_OK) {
+            ESP_LOGI("dac", "DAC output range set to 0–10 V successfully");
+          } else {
+            ESP_LOGW("dac", "Failed to set DAC output range, I2C error %d", (int)err);
+          }
+
+          // Initialize DAC output to 0 V
+          uint16_t data = 0;      // 15-bit DAC, initial value 0
+          data <<= 1;              // shift for 15-bit DAC
+
+          // Prepare I2C buffer
+          uint8_t buf[3] = {id(dac_duty_cycle_reg), (uint8_t)(data & 0xFF), (uint8_t)(data >> 8)};
+
+          // Write initial DAC value
+          err = id(i2cbus).write(id(dac_addr_reg), buf, 3);
+          if (err == esphome::i2c::ERROR_OK) {
+            ESP_LOGI("dac", "DAC initialized to 0 V successfully");
+          } else {
+            ESP_LOGW("dac", "Failed to initialize DAC, I2C error %d", (int)err);
+          }
+
+
 
 esp32:
   board: esp32dev
   framework:
     type: esp-idf
 
+button:
+  - <<: !include common/button/restart.yaml
+
+binary_sensor:
+  - <<: !include common/binary_sensor/status.yaml
+
+text_sensor:
+  - <<: !include common/text_sensor/version.yaml
+  - <<: !include common/text_sensor/wifi_info.yaml
+
+sensor:
+  - <<: !include common/sensor/uptime.yaml
+  - <<: !include common/sensor/wifi_signal.yaml
+
+i2c:
+  sda: 21
+  scl: 22
+  scan: true
+  id: i2cbus
+
 output:
   - platform: gpio
     id: ssr_relay_1
     pin: 25
 
-sensor:
-  - <<: !include common/sensor/uptime.yaml
-  - <<: !include common/sensor/wifi_signal.yaml
-  - platform: mqtt_subscribe
-    id: grid_returned
-    topic: "dsmr/reading/electricity_currently_returned"
-    unit_of_measurement: "W"
-    internal: true
+globals:
+  - id: dac_addr_reg
+    type: uint8_t
+    restore_value: false
+    initial_value: '0x58'
+
+  - id: dac_voltage_reg
+    type: uint8_t
+    restore_value: false
+    initial_value: '0x01'
+
+  - id: dac_duty_cycle_reg
+    type: uint8_t
+    restore_value: false
+    initial_value: '0x02'
+
+  - id: dac_voltage_mode_data
+    type: uint8_t
+    restore_value: false
+    initial_value: '0x11' # 0x11 = 0-10 Volt
+
+  - id: max_power
+    type: float
+    restore_value: true
+    initial_value: '0.0'
+
+  - id: power_value
+    type: float
+    restore_value: true
+    initial_value: '0.0'
 
 number:
   - platform: template
-    name: "Heater Power Level"
-    id: heater_power_level
+    name: "${device_name}_max_power"
+    id: max_power_input
     min_value: 0
-    max_value: 100
+    max_value: 3680
     step: 1
     optimistic: true
-    restore_value: true
-    icon: "mdi:fire"
-
-globals:
-  - id: heater_max_watts
-    type: float
-    restore_value: no
-    initial_value: '2000.0'
-  - id: heater_rated_watts
-    type: float
-    restore_value: no
-    initial_value: '2000.0'
-
-interval:
-  - interval: 10ms
-    then:
+    set_action:
       - lambda: |-
-          static int counter = 0;
-          counter++;
-          const int cycle_length = 10; // 10 * 100ms = 1 second
-          if (counter >= cycle_length) counter = 0;
+          id(max_power) = x;
+          ESP_LOGI("router", "Max router power set to %.0f W", x);
 
-          // Limit effective power
-          float user_percent = id(heater_power_level).state;
-          float limit_percent = (id(heater_max_watts) / id(heater_rated_watts)) * 100.0;
-          float safe_percent = (user_percent > limit_percent) ? limit_percent : user_percent;
+  - platform: template
+    name: "${device_name}_power"
+    id: power
+    min_value: 0
+    max_value: 3680
+    step: 1
+    optimistic: true
+    set_action:
+      - lambda: |-
+          float power = x;
 
-          // Calculate ON time steps
-          int on_steps = (int)(safe_percent * cycle_length / 100.0);
+          // Clamp to dynamic max power
+          if (power > id(max_power)) {
+            power = id(max_power);
+          }
+          id(power_value) = power;
 
-          if (counter < on_steps)
-            id(ssr_relay_1).turn_on();
-          else
-            id(ssr_relay_1).turn_off();
+          // calculate DAC value based on dynamic maximum power
+          uint16_t data = (uint16_t)((power / id(max_power)) * 32767.0f);
+
+          // 15-bit DAC requires shifting one bit to the left
+          data <<= 1;
+
+          uint8_t buf[3] = {id(dac_duty_cycle_reg), (uint8_t)(data & 0xFF), (uint8_t)(data >> 8)};
+
+          // send DAC data via I2C
+          auto err = id(i2cbus).write(id(dac_addr_reg), buf, 3);
+          if (err == esphome::i2c::ERROR_OK) {
+            // calculate approximate output voltage for logging
+            float volts = (power / id(max_power)) * 10.0f;
+            ESP_LOGI("dac", "DAC output set to %.2f V for %.1f W (data=%d)", volts, power, data);
+          } else {
+            ESP_LOGW("dac", "I2C write error: %d", (int)err);
+          }
+
