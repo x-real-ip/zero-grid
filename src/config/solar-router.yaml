@@ -16,7 +16,7 @@ esphome:
     priority: -10
     then:
       - lambda: |-
-          dac_set_output_range(id(i2cbus), id(dac_addr_reg), OutputRange::id(dac_voltage_mode));
+          dac_set_output_range(id(i2cbus), id(dac_addr_reg));
 
           // Initialize DAC output to 0 V
           uint16_t data = 0;      // 15-bit DAC, initial value 0
@@ -26,7 +26,7 @@ esphome:
           uint8_t buf[3] = {id(dac_duty_cycle_reg), (uint8_t)(data & 0xFF), (uint8_t)(data >> 8)};
 
           // Write initial DAC value
-          err = id(i2cbus).write(id(dac_addr_reg), buf, 3);
+          esphome::i2c::ErrorCode err = id(i2cbus).write(id(dac_addr_reg), buf, 3);
           if (err == esphome::i2c::ERROR_OK) {
             ESP_LOGI("dac", "DAC initialized to 0 V successfully");
           } else {
@@ -98,12 +98,6 @@ globals:
     type: uint8_t
     restore_value: false
     initial_value: "0x02"
-
-  - id: dac_voltage_mode
-    type: std::string
-    restore_value: yes
-    max_restore_data_length: 24
-    initial_value: '"RANGE_0_10V"'
 
   - id: max_power
     type: float
