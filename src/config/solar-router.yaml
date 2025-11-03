@@ -1,34 +1,22 @@
 ---
 <<: !include common/base.yaml
-# <<: !include common/mqtt.yaml
 
 substitutions:
   device_name: "solar-router"
-  device_comment: "Routes surplus solar power to a heating element to heat water or for space heating"
+  device_comment:
+    "Routes surplus solar power to a heating element to heat water or for space
+    heating"
 
 esphome:
   name: ${device_name}
   comment: ${device_comment}
+  includes:
+    - solar-router.h
   on_boot:
     priority: -10
     then:
       - lambda: |-
-          // Initialize DAC: set voltage output mode (0–10 V)
-          esphome::i2c::ErrorCode err;
-
-          // Send register address
-          err = id(i2cbus).write(id(dac_addr_reg), &id(dac_voltage_reg), 1, false);
-          if (err != esphome::i2c::ERROR_OK) {
-            ESP_LOGW("dac", "Failed to write DAC register address, I2C error %d", (int)err);
-          }
-
-          // Send output mode data (0–10 V)
-          err = id(i2cbus).write(id(dac_addr_reg), &id(dac_voltage_mode_data), 1);
-          if (err == esphome::i2c::ERROR_OK) {
-            ESP_LOGI("dac", "DAC output range set to 0–10 V successfully");
-          } else {
-            ESP_LOGW("dac", "Failed to set DAC output range, I2C error %d", (int)err);
-          }
+          dac_set_output_range(id(i2cbus), id(dac_addr_reg), OutputRange::id(dac_voltage_mode));
 
           // Initialize DAC output to 0 V
           uint16_t data = 0;      // 15-bit DAC, initial value 0
@@ -44,8 +32,6 @@ esphome:
           } else {
             ESP_LOGW("dac", "Failed to initialize DAC, I2C error %d", (int)err);
           }
-
-
 
 esp32:
   board: esp32dev
@@ -66,11 +52,36 @@ sensor:
   - <<: !include common/sensor/uptime.yaml
   - <<: !include common/sensor/wifi_signal.yaml
 
+  - platform: mqtt_subscribe
+    id: grid_power_returned
+    # topic: "dsmr/reading/electricity_currently_returned"
+    topic: "dsmr/reading/electricity_currently_delivered" # Test Topic
+    unit_of_measurement: "W"
+    internal: true
+    on_value:
+      - lambda: |-
+          if (!id(manual_mode)) {
+            id(power_value) = x;
+            id(power).publish_state(x);  // updates the input number (slider)
+          }
+
+  - platform: mqtt_subscribe
+    id: grid_voltage
+    topic: "dsmr/reading/phase_voltage_l1"
+    unit_of_measurement: "V"
+    internal: true
+
 i2c:
   sda: 21
   scl: 22
   scan: true
   id: i2cbus
+
+mqtt:
+  broker: "mqtt.lan.stamx.nl"
+  username: !secret mqtt_user
+  password: !secret mqtt_password
+  discovery: false
 
 output:
   - platform: gpio
@@ -81,32 +92,71 @@ globals:
   - id: dac_addr_reg
     type: uint8_t
     restore_value: false
-    initial_value: '0x58'
-
-  - id: dac_voltage_reg
-    type: uint8_t
-    restore_value: false
-    initial_value: '0x01'
+    initial_value: "0x58"
 
   - id: dac_duty_cycle_reg
     type: uint8_t
     restore_value: false
-    initial_value: '0x02'
+    initial_value: "0x02"
 
-  - id: dac_voltage_mode_data
-    type: uint8_t
-    restore_value: false
-    initial_value: '0x11' # 0x11 = 0-10 Volt
+  - id: dac_voltage_mode
+    type: std::string
+    restore_value: yes
+    max_restore_data_length: 24
+    initial_value: '"RANGE_0_10V"'
 
   - id: max_power
     type: float
     restore_value: true
-    initial_value: '0.0'
+    initial_value: "0.0"
 
   - id: power_value
     type: float
     restore_value: true
-    initial_value: '0.0'
+    initial_value: "0.0"
+
+  - id: load_resistance
+    type: float
+    restore_value: no
+    initial_value: '26.5'
+
+  - id: manual_mode
+    type: bool
+    initial_value: 'false'
+
+functions:
+  - lambda: |-
+      void update_dac(float power) {
+        // Clamp
+        if (power > id(max_power)) power = id(max_power);
+
+        uint16_t data = (uint16_t)((power / id(max_power)) * 32767.0f);
+        data <<= 1;
+
+        uint8_t buf[3] = {id(dac_duty_cycle_reg), (uint8_t)(data & 0xFF), (uint8_t)(data >> 8)};
+        auto err = id(i2cbus).write(id(dac_addr_reg), buf, 3);
+        if (err == esphome::i2c::ERROR_OK) {
+          float volts = (power / id(max_power)) * 10.0f;
+          ESP_LOGI("dac", "DAC set to %.2f V for %.1f W (data=%d)", volts, power, data);
+        } else {
+          ESP_LOGW("dac", "I2C write error: %d", (int)err);
+        }
+      }
+
+switch:
+  - platform: template
+    name: "${device_name}_manual_mode"
+    id: manual_mode_switch
+    restore_mode: 'RESTORE_DEFAULT_OFF'
+    optimistic: true
+    turn_on_action:
+      - lambda: |-
+          id(manual_mode) = true;
+          ESP_LOGI("mode", "Manual mode enabled");
+    turn_off_action:
+      - lambda: |-
+          id(manual_mode) = false;
+          ESP_LOGI("mode", "Auto mode enabled");
 
 number:
   - platform: template
@@ -155,4 +205,3 @@ number:
           } else {
             ESP_LOGW("dac", "I2C write error: %d", (int)err);
           }
-
