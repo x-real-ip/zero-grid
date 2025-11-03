@@ -124,25 +124,6 @@ globals:
     type: bool
     initial_value: 'false'
 
-functions:
-  - lambda: |-
-      void update_dac(float power) {
-        // Clamp
-        if (power > id(max_power)) power = id(max_power);
-
-        uint16_t data = (uint16_t)((power / id(max_power)) * 32767.0f);
-        data <<= 1;
-
-        uint8_t buf[3] = {id(dac_duty_cycle_reg), (uint8_t)(data & 0xFF), (uint8_t)(data >> 8)};
-        auto err = id(i2cbus).write(id(dac_addr_reg), buf, 3);
-        if (err == esphome::i2c::ERROR_OK) {
-          float volts = (power / id(max_power)) * 10.0f;
-          ESP_LOGI("dac", "DAC set to %.2f V for %.1f W (data=%d)", volts, power, data);
-        } else {
-          ESP_LOGW("dac", "I2C write error: %d", (int)err);
-        }
-      }
-
 switch:
   - platform: template
     name: "${device_name}_manual_mode"
