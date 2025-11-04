@@ -49,9 +49,21 @@ sensor:
     internal: true
     filters:
       - lambda: |-
-          float w = x * 1000.0;  // convert kWh to W
+          float power = x * 1000.0;  // convert kWh to W
           id(grid_power_returned) = w;
-          return w;
+
+          if (!id(manual_mode)) {
+            route_power_to_load(
+              id(i2cbus),
+              id(dac_addr_reg),
+              power,
+              id(load_max_power),
+              id(load_resistance),
+              id(grid_voltage),
+            );
+          }
+
+          return power;
 
   - platform: mqtt_subscribe
     id: grid_voltage
