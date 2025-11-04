@@ -36,3 +36,42 @@ inline esphome::i2c::ErrorCode dac_set_output_range(
 
     return err;
 }
+
+/**
+ * Set DAC output voltage (0–10V) for 15-bit DAC
+ * Pointer to the I2C bus
+ * DAC I2C address
+ * Desired output voltage (0.0–10.0V)
+ * esphome::i2c::ErrorCode
+ */
+inline esphome::i2c::ErrorCode dac_set_voltage(
+    sphome::i2c::I2CBus *bus,
+    uint8_t address,
+    float volts)
+{
+    // Clamp volts to 0–10V
+    if (volts < 0.0f)
+        volts = 0.0f;
+    if (volts > 10.0f)
+        volts = 10.0f;
+
+    // Convert volts to 15-bit DAC value
+    uint16_t data = static_cast<uint16_t>((volts / 10.0f) * 32767.0f);
+    data <<= 1; // shift for 15-bit DAC
+
+    // Prepare I2C buffer: [register, low byte, high byte]
+    uint8_t buf[3] = {0x02, static_cast<uint8_t>(data & 0xFF), static_cast<uint8_t>(data >> 8)};
+
+    // Write buffer to DAC
+    esphome::i2c::ErrorCode err = bus->write(address, buf, 3);
+    if (err == esphome::i2c::ERROR_OK)
+    {
+        ESP_LOGI("dac", "DAC set to %.2f V (data=%d)", volts, data);
+    }
+    else
+    {
+        ESP_LOGW("dac", "DAC I2C write error %d", static_cast<int>(err));
+    }
+
+    return err;
+}

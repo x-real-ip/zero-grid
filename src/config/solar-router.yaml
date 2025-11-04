@@ -1,6 +1,9 @@
 ---
 <<: !include common/base.yaml
 
+logger:
+  level: DEBUG
+
 substitutions:
   device_name: "solar-router"
   device_comment:
@@ -17,21 +20,7 @@ esphome:
     then:
       - lambda: |-
           dac_set_output_range(id(i2cbus), id(dac_addr_reg));
-
-          // Initialize DAC output to 0 V
-          uint16_t data = 0;      // 15-bit DAC, initial value 0
-          data <<= 1;              // shift for 15-bit DAC
-
-          // Prepare I2C buffer
-          uint8_t buf[3] = {id(dac_duty_cycle_reg), (uint8_t)(data & 0xFF), (uint8_t)(data >> 8)};
-
-          // Write initial DAC value
-          esphome::i2c::ErrorCode err = id(i2cbus).write(id(dac_addr_reg), buf, 3);
-          if (err == esphome::i2c::ERROR_OK) {
-            ESP_LOGI("dac", "DAC initialized to 0 V successfully");
-          } else {
-            ESP_LOGW("dac", "Failed to initialize DAC, I2C error %d", (int)err);
-          }
+          dac_set_voltage(id(i2cbus), id(dac_addr_reg), 0.0);
 
 esp32:
   board: esp32dev
