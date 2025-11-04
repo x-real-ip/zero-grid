@@ -42,17 +42,15 @@ sensor:
   - <<: !include common/sensor/wifi_signal.yaml
 
   - platform: mqtt_subscribe
-    id: grid_power_returned
+    id: grid_power_returned_sensor
     # topic: "dsmr/reading/electricity_currently_returned"
     topic: "dsmr/reading/electricity_currently_delivered" # Test Topic
     unit_of_measurement: "W"
     internal: true
-    on_value:
+    filters:
       - lambda: |-
-          if (!id(manual_mode)) {
-            id(power_value) = x;
-            id(power).publish_state(x);  // updates the input number (slider)
-          }
+          // Convert kWh to W
+          return x * 1000.0;
 
   - platform: mqtt_subscribe
     id: grid_voltage
@@ -93,7 +91,7 @@ globals:
     restore_value: true
     initial_value: "0.0"
 
-  - id: power_value
+  - id: grid_power_returned
     type: float
     restore_value: true
     initial_value: "0.0"
