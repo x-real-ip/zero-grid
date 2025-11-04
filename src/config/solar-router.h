@@ -104,7 +104,7 @@ inline esphome::i2c::ErrorCode dac_set_voltage(
  * @param bus                 Pointer to the ESPHome I2C bus
  * @param address             DAC I2C address
  * @param grid_power_returned Power currently being returned to the grid (W)
- * @param load_max_watts      Maximum power allowed for the heater (W)
+ * @param load_max_power      Maximum power allowed for the heater (W)
  * @param load_resistance     Resistance of the heater (Ohm)
  * @param grid_voltage        Current measured grid voltage (V)
  */
@@ -112,15 +112,15 @@ inline void route_power_to_load(
     esphome::i2c::I2CBus *bus,
     uint8_t address,
     float grid_power_returned,
-    float load_max_watts,
+    float load_max_power,
     float load_resistance,
     float grid_voltage)
 {
     // Clamp returned watts
     if (grid_power_returned < 0)
         grid_power_returned = 0;
-    if (grid_power_returned > load_max_watts)
-        grid_power_returned = load_max_watts;
+    if (grid_power_returned > load_max_power)
+        grid_power_returned = load_max_power;
 
     // Target heater power = returned power
     float load_target_power = grid_power_returned;
