@@ -135,4 +135,6 @@ inline void route_power_to_load(
     dac_set_voltage(bus, address, dac_volts);
 
     ESP_LOGI("heater", "Returned %.1f W → heater %.1f W, DAC %.2f V", grid_power_returned, load_target_power, dac_volts);
+
+    return load_target_power;
 }

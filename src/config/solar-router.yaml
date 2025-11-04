@@ -42,21 +42,38 @@ sensor:
   - <<: !include common/sensor/wifi_signal.yaml
 
   - platform: mqtt_subscribe
-    id: grid_power_returned_sensor
+    id: grid_power_returned_mqtt
     # topic: "dsmr/reading/electricity_currently_returned"
     topic: "dsmr/reading/electricity_currently_delivered" # Test Topic
     unit_of_measurement: "W"
     internal: true
     filters:
       - lambda: |-
-          // Convert kWh to W
-          return x * 1000.0;
+          float w = x * 1000.0;  // convert kWh to W
+          id(grid_power_returned) = w;
+          return w;
 
   - platform: mqtt_subscribe
     id: grid_voltage
     topic: "dsmr/reading/phase_voltage_l1"
     unit_of_measurement: "V"
     internal: true
+
+  - platform: template
+    name: "${device_name}_load_max_power"
+    id: load_max_power_sensor
+    unit_of_measurement: "W"
+    lambda: |-
+      // Return the value of the global variable
+      return id(load_max_power);
+
+  - platform: template
+    name: "${device_name}_load_routed_power"
+    id: load_routed_power_sensor
+    unit_of_measurement: "W"
+    lambda: |-
+      // Return the value of the power send to the
+      return id();
 
 i2c:
   sda: 21
@@ -86,12 +103,17 @@ globals:
     restore_value: false
     initial_value: "0x02"
 
-  - id: max_power
+  - id: grid_power_returned
+    type: float
+    restore_value: false
+    initial_value: "0.0"
+
+  - id: load_max_power
     type: float
     restore_value: true
     initial_value: "0.0"
 
-  - id: grid_power_returned
+  - id: power_value
     type: float
     restore_value: true
     initial_value: "0.0"
@@ -122,15 +144,16 @@ switch:
 
 number:
   - platform: template
-    name: "${device_name}_max_power"
-    id: max_power_input
+    name: "${device_name}_load_max_power_setpoint"
+    id: load_max_power_setpoint
     min_value: 0
     max_value: 3680
     step: 1
     optimistic: true
     set_action:
       - lambda: |-
-          id(max_power) = x;
+          id(load_max_power) = x;
+          id(load_max_power_sensor).publish_state(id(load_max_power));
           ESP_LOGI("router", "Max router power set to %.0f W", x);
 
   - platform: template
@@ -145,13 +168,13 @@ number:
           float power = x;
 
           // Clamp to dynamic max power
-          if (power > id(max_power)) {
-            power = id(max_power);
+          if (power > id(load_max_power)) {
+            power = id(load_max_power);
           }
           id(power_value) = power;
 
           // calculate DAC value based on dynamic maximum power
-          uint16_t data = (uint16_t)((power / id(max_power)) * 32767.0f);
+          uint16_t data = (uint16_t)((power / id(load_max_power)) * 32767.0f);
 
           // 15-bit DAC requires shifting one bit to the left
           data <<= 1;
@@ -162,7 +185,7 @@ number:
           auto err = id(i2cbus).write(id(dac_addr_reg), buf, 3);
           if (err == esphome::i2c::ERROR_OK) {
             // calculate approximate output voltage for logging
-            float volts = (power / id(max_power)) * 10.0f;
+            float volts = (power / id(load_max_power)) * 10.0f;
             ESP_LOGI("dac", "DAC output set to %.2f V for %.1f W (data=%d)", volts, power, data);
           } else {
             ESP_LOGW("dac", "I2C write error: %d", (int)err);
