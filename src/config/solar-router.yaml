@@ -50,7 +50,7 @@ sensor:
     filters:
       - lambda: |-
           float power = x * 1000.0;  // convert kWh to W
-          id(grid_power_returned) = w;
+          id(grid_power_returned) = power;
 
           if (!id(manual_mode)) {
             route_power_to_load(
@@ -59,7 +59,7 @@ sensor:
               power,
               id(load_max_power),
               id(load_resistance),
-              id(grid_voltage),
+              id(grid_voltage).state
             );
           }
 
@@ -178,7 +178,6 @@ number:
     set_action:
       - lambda: |-
           float power = x;
-
           if (id(manual_mode)) {
             route_power_to_load(
               id(i2cbus),
@@ -186,8 +185,8 @@ number:
               power,
               id(load_max_power),
               id(load_resistance),
-              id(grid_voltage),
+              id(grid_voltage).state
             );
           }
-
-          return power;
+          id(power_value) = power;  // store in global
+          ESP_LOGI("router", "Power set to %.1f W", power);
