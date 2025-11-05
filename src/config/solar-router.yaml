@@ -42,6 +42,12 @@ sensor:
   - <<: !include common/sensor/wifi_signal.yaml
 
   - platform: mqtt_subscribe
+    id: grid_voltage
+    topic: "dsmr/reading/phase_voltage_l1"
+    unit_of_measurement: "V"
+    internal: true
+
+  - platform: mqtt_subscribe
     id: grid_power_returned_mqtt
     topic: "dsmr/reading/electricity_currently_returned"
     unit_of_measurement: "W"
@@ -63,13 +69,45 @@ sensor:
           id(grid_power_delivered) = power;
           return power;
 
+  # - platform: template
+  #   name: "Grid Power"
+  #   id: grid_power
+  #   unit_of_measurement: "W"
+  #   lambda: |-
+  #     return id(grid_power_delivered) - id(grid_power_returned);
+  #   update_interval: '1s'
+
   - platform: template
-    name: "Grid Power"
-    id: grid_power
+    name: "Grid Power (test)"
+    id: grid_power_sensor
+    unit_of_measurement: "W"
+    update_interval: '1s'
+    lambda: |-
+      float delivered = id(grid_power_delivered);
+      float returned  = id(grid_power_returned);
+      if (isnan(delivered)) delivered = 0.0;
+      if (isnan(returned)) returned = 0.0;
+
+      float gridpower = returned - delivered;
+      id(grid_power) = gridpower;  // assign to global
+      return gridpower;
+
+  - platform: template
+    name: "Load max power"
+    id: load_max_power_sensor
     unit_of_measurement: "W"
     lambda: |-
-      return id(grid_power_delivered) - id(grid_power_returned);
-    update_interval: "1s"
+      // Return the value of the global variable
+      return id(load_max_power);
+
+  - platform: template
+    name: "Target load power"
+    id: target_load_power_sensor
+    unit_of_measurement: "W"
+    update_interval: '1s'
+    lambda: |-
+      // Return the value of the global variable
+      return id(target_load_power);
 
   # - platform: mqtt_subscribe
   #   id: grid_power_returned_mqtt
@@ -95,38 +133,6 @@ sensor:
 
   #         return power;
 
-  - platform: mqtt_subscribe
-    id: grid_voltage
-    topic: "dsmr/reading/phase_voltage_l1"
-    unit_of_measurement: "V"
-    internal: true
-
-  - platform: template
-    name: "Load max power"
-    id: load_max_power_sensor
-    unit_of_measurement: "W"
-    lambda: |-
-      // Return the value of the global variable
-      return id(load_max_power);
-
-interval:
-  - interval: 1s
-    then:
-      - lambda: |-
-          const float dt = 1.0;
-          const float Kp = 0.5;
-          const float Ki = 0.1;
-          const float Kd = 0.05;
-
-          id(target_load_power) = pid_target_load_power(
-              id(grid_power),
-              id(target_load_power),
-              id(load_max_power),
-              Kp, Ki, Kd,
-              dt,
-              id(pid_integral),
-              id(pid_error_prev)
-          );
 
 i2c:
   sda: 21
@@ -171,7 +177,7 @@ globals:
     restore_value: true
     initial_value: "0.0"
 
-  - id: power_value
+  - id: grid_power
     type: float
     restore_value: true
     initial_value: "0.0"
@@ -185,21 +191,41 @@ globals:
     type: bool
     initial_value: "false"
 
+  - id: target_load_power
+    type: float
+    restore_value: false
+    initial_value: '0.0'
+
   - id: pid_integral
     type: float
     restore_value: true
-    initial_value: "0.0"
-
+    initial_value: '0.0'
+    
   - id: pid_error_prev
     type: float
     restore_value: true
-    initial_value: "0.0"
+    initial_value: '0.0'
 
-  - id: target_load_power
+  - id: pid_dt
     type: float
     restore_value: true
-    initial_value: "0.0"
+    initial_value: '1.0'
 
+  - id: pid_Kp
+    type: float
+    restore_value: true
+    initial_value: '0.1'
+
+  - id: pid_Ki
+    type: float
+    restore_value: true
+    initial_value: '0.3'
+
+  - id: pid_Kd
+    type: float
+    restore_value: true
+    initial_value: '0.05'
+    
 switch:
   - platform: template
     name: "Manual mode"
@@ -249,5 +275,29 @@ number:
               id(grid_voltage).state
             );
           }
-          id(power_value) = power;  // store in global
+          id(target_load_power) = power;  // store in global
           ESP_LOGI("router", "Power set to %.1f W", power);
+
+interval:
+  - interval: 1s
+    then:
+      - lambda: |-
+          ESP_LOGD("PID", "grid_power=%.1f, target_prev=%.1f, dt=%.1f", id(grid_power), id(target_load_power), id(pid_dt));
+          ESP_LOGD("PID", "Kp=%.2f, Ki=%.2f, Kd=%.2f", id(pid_Kp), id(pid_Ki), id(pid_Kd));
+          ESP_LOGD("PID", "integral_prev=%.1f, error_prev=%.1f", id(pid_integral), id(pid_error_prev));
+
+          if (isnan(id(target_load_power))) id(target_load_power) = 0.0;
+          if (isnan(id(pid_integral))) id(pid_integral) = 0.0;
+          if (isnan(id(pid_error_prev))) id(pid_error_prev) = 0.0;
+
+          id(target_load_power) = pid_target_load_power(
+              id(grid_power),
+              id(target_load_power),
+              id(load_max_power),
+              id(pid_Kp),
+              id(pid_Ki),
+              id(pid_Kd),
+              id(pid_dt),
+              id(pid_integral),
+              id(pid_error_prev)
+          );
