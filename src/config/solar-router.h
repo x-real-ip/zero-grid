@@ -95,35 +95,35 @@ inline esphome::i2c::ErrorCode dac_set_voltage(
 }
 
 /**
- * @brief Routes returned grid power to a resistive heater via DAC.
+ * @brief Routes power to a resistive load via DAC.
  * 
- * This function calculates the voltage required across the heater to consume
- * the same power as is being returned to the grid. It then maps this voltage
+ * This function calculates the voltage required across the load to consume
+ * the same power. It then maps this voltage
  * to a 0–10V DAC output and sends it to the DAC over I2C.
  * 
  * @param bus                 Pointer to the ESPHome I2C bus
  * @param address             DAC I2C address
- * @param grid_power_returned Power currently being returned to the grid (W)
- * @param load_max_power      Maximum power allowed for the heater (W)
+ * @param target_power        Power that must be routed (W)
+ * @param load_max_power      Maximum power allowed for the load (W)
  * @param load_resistance     Resistance of the heater (Ohm)
  * @param grid_voltage        Current measured grid voltage (V)
  */
 inline void route_power_to_load(
     esphome::i2c::I2CBus *bus,
     uint8_t address,
-    float grid_power_returned,
+    float target_power,
     float load_max_power,
     float load_resistance,
     float grid_voltage)
 {
     // Clamp returned watts
-    if (grid_power_returned < 0)
-        grid_power_returned = 0;
-    if (grid_power_returned > load_max_power)
-        grid_power_returned = load_max_power;
+    if (target_power < 0)
+        target_power = 0;
+    if (target_power > load_max_power)
+        target_power = load_max_power;
 
     // Target heater power = returned power
-    float load_target_power = grid_power_returned;
+    float load_target_power = target_power;
 
     // Calculate voltage needed across heater to achieve target power
     float load_voltage = sqrt(load_target_power * load_resistance);
@@ -134,5 +134,49 @@ inline void route_power_to_load(
     // Send voltage to DAC
     dac_set_voltage(bus, address, dac_volts);
 
-    ESP_LOGI("heater", "Returned %.1f W → heater %.1f W, DAC %.2f V", grid_power_returned, load_target_power, dac_volts);
+    ESP_LOGI("heater", "Returned %.1f W → heater %.1f W, DAC %.2f V", target_power, load_target_power, dac_volts);
+}
+
+/**
+ * @brief Calculate the target load power using a PID controller to keep grid power at 0 W.
+ * 
+ * @param grid_power          Current grid power (W), negative = surplus, positive = from the grid
+ * @param target_power_prev   Previous target load power (W), used for PID
+ * @param load_max_power      Maximum load power (W)
+ * @param Kp                  Proportional gain
+ * @param Ki                  Integral gain
+ * @param Kd                  Derivative gain
+ * @param dt                  Time interval since last update (s)
+ * @param integral_prev       Previous integral value (W·s), will be updated
+ * @param error_prev          Previous error value (W), used for the derivative term
+ * @return float              New target load power (W)
+ */
+inline float pid_target_load_power(
+    float grid_power,
+    float target_power_prev,
+    float load_max_power,
+    float Kp,
+    float Ki,
+    float Kd,
+    float dt,
+    float &integral_prev,
+    float &error_prev)
+{
+    // Setpoint = 0 W (we want returned power to be zero)
+    float error = -grid_power;  // negative grid power = surplus → positive error
+    integral_prev += error * dt;
+    float derivative = (error - error_prev) / dt;
+
+    float pid_target_load_power = Kp * error + Ki * integral_prev + Kd * derivative;
+
+    // Clamp pid_target_load_power to 0 or max power
+    if (pid_target_load_power < 0.0f)
+        pid_target_load_power = 0.0f;
+    if (pid_target_load_power > load_max_power)
+        pid_target_load_power = load_max_power;
+
+    // Store current error for next update
+    error_prev = error;
+
+    return pid_target_load_power;
 }

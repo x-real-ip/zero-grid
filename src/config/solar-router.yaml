@@ -43,27 +43,57 @@ sensor:
 
   - platform: mqtt_subscribe
     id: grid_power_returned_mqtt
-    # topic: "dsmr/reading/electricity_currently_returned"
-    topic: "dsmr/reading/electricity_currently_delivered" # Test Topic
+    topic: "dsmr/reading/electricity_currently_returned"
     unit_of_measurement: "W"
     internal: true
     filters:
       - lambda: |-
           float power = x * 1000.0;  // convert kWh to W
           id(grid_power_returned) = power;
-
-          if (!id(manual_mode)) {
-            route_power_to_load(
-              id(i2cbus),
-              id(dac_addr_reg),
-              power,
-              id(load_max_power),
-              id(load_resistance),
-              id(grid_voltage).state
-            );
-          }
-
           return power;
+
+  - platform: mqtt_subscribe
+    id: grid_power_delivered_mqtt
+    topic: "dsmr/reading/electricity_currently_delivered"
+    unit_of_measurement: "W"
+    internal: true
+    filters:
+      - lambda: |-
+          float power = x * 1000.0;  // convert kWh to W
+          id(grid_power_delivered) = power;
+          return power;
+
+  - platform: template
+    name: "Grid Power"
+    id: grid_power
+    unit_of_measurement: "W"
+    lambda: |-
+      return id(grid_power_delivered) - id(grid_power_returned);
+    update_interval: '1s'
+
+  # - platform: mqtt_subscribe
+  #   id: grid_power_returned_mqtt
+  #   # topic: "dsmr/reading/electricity_currently_returned"
+  #   topic: "dsmr/reading/electricity_currently_delivered" # Test Topic
+  #   unit_of_measurement: "W"
+  #   internal: true
+  #   filters:
+  #     - lambda: |-
+  #         float power = x * 1000.0;  // convert kWh to W
+  #         id(grid_power_returned) = power;
+
+  #         if (!id(manual_mode)) {
+  #           route_power_to_load(
+  #             id(i2cbus),
+  #             id(dac_addr_reg),
+  #             power,
+  #             id(load_max_power),
+  #             id(load_resistance),
+  #             id(grid_voltage).state
+  #           );
+  #         }
+
+  #         return power;
 
   - platform: mqtt_subscribe
     id: grid_voltage
@@ -72,20 +102,31 @@ sensor:
     internal: true
 
   - platform: template
-    name: "${device_name}_load_max_power"
+    name: "Load max power"
     id: load_max_power_sensor
     unit_of_measurement: "W"
     lambda: |-
       // Return the value of the global variable
       return id(load_max_power);
 
-  # - platform: template
-  #   name: "${device_name}_load_routed_power"
-  #   id: load_routed_power_sensor
-  #   unit_of_measurement: "W"
-  #   lambda: |-
-  #     // Return the value of the power send to the
-  #     return id();
+interval:
+  - interval: 1s
+    then:
+      - lambda: |-
+          const float dt = 1.0;  
+          const float Kp = 0.5;
+          const float Ki = 0.1;
+          const float Kd = 0.05;
+
+          id(target_load_power) = pid_target_load_power(
+              id(grid_power),
+              id(target_load_power),
+              id(load_max_power),
+              Kp, Ki, Kd,
+              dt,
+              id(pid_integral),
+              id(pid_error_prev)
+          );
 
 i2c:
   sda: 21
@@ -120,6 +161,11 @@ globals:
     restore_value: false
     initial_value: "0.0"
 
+  - id: grid_power_delivered
+    type: float
+    restore_value: false
+    initial_value: "0.0"
+
   - id: load_max_power
     type: float
     restore_value: true
@@ -139,9 +185,24 @@ globals:
     type: bool
     initial_value: "false"
 
+  - id: pid_integral
+    type: float
+    restore_value: true
+    initial_value: '0.0'
+    
+  - id: pid_error_prev
+    type: float
+    restore_value: true
+    initial_value: '0.0'
+    
+  - id: target_load_power
+    type: float
+    restore_value: true
+    initial_value: '0.0'
+
 switch:
   - platform: template
-    name: "${device_name}_manual_mode"
+    name: "Manual mode"
     id: manual_mode_switch
     restore_mode: "RESTORE_DEFAULT_OFF"
     optimistic: true
@@ -156,7 +217,7 @@ switch:
 
 number:
   - platform: template
-    name: "${device_name}_load_max_power_setpoint"
+    name: "Load max power setpoint"
     id: load_max_power_setpoint
     min_value: 0
     max_value: 3680
