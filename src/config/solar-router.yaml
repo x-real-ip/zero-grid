@@ -69,7 +69,7 @@ sensor:
     unit_of_measurement: "W"
     lambda: |-
       return id(grid_power_delivered) - id(grid_power_returned);
-    update_interval: '1s'
+    update_interval: "1s"
 
   # - platform: mqtt_subscribe
   #   id: grid_power_returned_mqtt
@@ -113,7 +113,7 @@ interval:
   - interval: 1s
     then:
       - lambda: |-
-          const float dt = 1.0;  
+          const float dt = 1.0;
           const float Kp = 0.5;
           const float Ki = 0.1;
           const float Kd = 0.05;
@@ -188,17 +188,17 @@ globals:
   - id: pid_integral
     type: float
     restore_value: true
-    initial_value: '0.0'
-    
+    initial_value: "0.0"
+
   - id: pid_error_prev
     type: float
     restore_value: true
-    initial_value: '0.0'
-    
+    initial_value: "0.0"
+
   - id: target_load_power
     type: float
     restore_value: true
-    initial_value: '0.0'
+    initial_value: "0.0"
 
 switch:
   - platform: template
