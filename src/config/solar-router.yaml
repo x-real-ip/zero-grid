@@ -69,16 +69,8 @@ sensor:
           id(grid_power_delivered) = power;
           return power;
 
-  # - platform: template
-  #   name: "Grid Power"
-  #   id: grid_power
-  #   unit_of_measurement: "W"
-  #   lambda: |-
-  #     return id(grid_power_delivered) - id(grid_power_returned);
-  #   update_interval: '1s'
-
   - platform: template
-    name: "Grid Power (test)"
+    name: "Grid Power"
     id: grid_power_sensor
     unit_of_measurement: "W"
     update_interval: '1s'
@@ -88,9 +80,24 @@ sensor:
       if (isnan(delivered)) delivered = 0.0;
       if (isnan(returned)) returned = 0.0;
 
-      float gridpower = returned - delivered;
+      float gridpower = delivered - returned;
       id(grid_power) = gridpower;  // assign to global
       return gridpower;
+
+  # - platform: template
+  #   name: "Grid Power (test)"
+  #   id: grid_power_sensor
+  #   unit_of_measurement: "W"
+  #   update_interval: '1s'
+  #   lambda: |-
+  #     float delivered = id(grid_power_delivered);
+  #     float returned  = id(grid_power_returned);
+  #     if (isnan(delivered)) delivered = 0.0;
+  #     if (isnan(returned)) returned = 0.0;
+
+  #     float gridpower = returned - delivered;
+  #     id(grid_power) = gridpower;  // assign to global
+  #     return gridpower;
 
   - platform: template
     name: "Load max power"
@@ -117,8 +124,7 @@ sensor:
   #   internal: true
   #   filters:
   #     - lambda: |-
-  #         float power = x * 1000.0;  // convert kWh to W
-  #         id(grid_power_returned) = power;
+  #         id(target_load_power) = power;
 
   #         if (!id(manual_mode)) {
   #           route_power_to_load(
@@ -132,7 +138,6 @@ sensor:
   #         }
 
   #         return power;
-
 
 i2c:
   sda: 21
