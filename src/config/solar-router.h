@@ -138,18 +138,26 @@ inline void route_power_to_load(
 }
 
 /**
- * @brief Calculate the target load power using a PID controller to keep grid power at 0 W.
+ * @brief Calculate the target load power using a PID controller with anti-windup.
  *
- * @param grid_power          Current grid power (W), negative = surplus, positive = from the grid
- * @param target_power_prev   Previous target load power (W), used for PID
- * @param load_max_power      Maximum load power (W)
- * @param Kp                  Proportional gain
- * @param Ki                  Integral gain
- * @param Kd                  Derivative gain
- * @param dt                  Time interval since last update (s)
- * @param integral_prev       Previous integral value (W·s), will be updated
- * @param error_prev          Previous error value (W), used for the derivative term
- * @return float              New target load power (W)
+ * This PID controller aims to keep the grid power at 0 W by adjusting the load power.
+ * Anti-windup is implemented by limiting the integral term from growing when the
+ * output is saturated, preventing excessive overshoot or slow recovery.
+ *
+ * The controller computes the output based on proportional, integral, and derivative
+ * terms, and clamps the final output within a specified range. Integration is only
+ * applied if the computed output is within the allowed range.
+ *
+ * @param grid_power                   Current measured grid power (W). Negative = surplus power available, positive = consuming from the grid.
+ * @param target_power_previous        Previous target load power (W), used as reference (not strictly required for computation here).
+ * @param load_max_power               Maximum allowable load power (W).
+ * @param Kp                           Proportional gain coefficient.
+ * @param Ki                           Integral gain coefficient.
+ * @param Kd                           Derivative gain coefficient.
+ * @param dt                           Time step since the last PID update (s).
+ * @param anti_windup_integral         Reference to the integral term (W·s), updated in-place with anti-windup logic.
+ * @param anti_windup_previous_error   Reference to the previous error value (W), updated for derivative calculation.
+ * @return float                       New target load power (W), clamped between anti-windup limits.
  */
 inline float pid_target_load_power(
     float grid_power,
@@ -162,40 +170,32 @@ inline float pid_target_load_power(
     float &anti_windup_integral,
     float &anti_windup_previous_error)
 {
-    // PID setpoint = 0 W (we want grid power returned to zero)
-    float error = -grid_power; // negative grid power = surplus → positive error
+    const float output_min = -300.0f;
+    const float output_max = 4000.0f;
+
+    float error = -grid_power;
     float derivative = (error - anti_windup_previous_error) / dt;
 
-    // Compute tentative PID output
+    // Compute tentative output
     float output_unsaturated = Kp * error + Ki * anti_windup_integral + Kd * derivative;
 
-    // Anti-windup output limits
-    const float anti_windup_output_min = -300.0f;
-    const float anti_windup_output_max = 4000.0f;
-
-    // Clamp output to anti-windup limits
+    // Clamp output
     float output = output_unsaturated;
-    if (output > anti_windup_output_max)
-        output = anti_windup_output_max;
-    if (output < anti_windup_output_min)
-        output = anti_windup_output_min;
+    if (output > output_max) output = output_max;
+    if (output < output_min) output = output_min;
 
-    // Anti-windup: only integrate if output is within limits
-    if (output == output_unsaturated)
-    {
+    // Anti-windup: integrate only if not saturated
+    if (fabs(output - output_unsaturated) < 0.001f)
         anti_windup_integral += error * dt;
-    }
 
     // Recalculate PID output with updated integral
     output_unsaturated = Kp * error + Ki * anti_windup_integral + Kd * derivative;
 
-    // Final clamp to ensure output stays within limits
-    if (output_unsaturated > anti_windup_output_max)
-        output_unsaturated = anti_windup_output_max;
-    if (output_unsaturated < anti_windup_output_min)
-        output_unsaturated = anti_windup_output_min;
+    // Final clamp
+    if (output_unsaturated > output_max) output_unsaturated = output_max;
+    if (output_unsaturated < output_min) output_unsaturated = output_min;
 
-    // Store error for derivative term in next iteration
+    // Store previous error for derivative
     anti_windup_previous_error = error;
 
     return output_unsaturated;
