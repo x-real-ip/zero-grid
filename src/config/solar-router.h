@@ -4,14 +4,14 @@
 
 /**
  * @brief Sets the voltage mode (range) of the DAC.
- * 
+ *
  * This function configures the DAC to operate in 0–10 V output mode.
  * It writes to the fixed DAC register 0x01 using the ESPHome I2C bus.
- * 
+ *
  * @param bus     Pointer to the ESPHome I2C bus
  * @param address I2C address of the DAC
  * @return esphome::i2c::ErrorCode Returns ERROR_OK if successful, otherwise the I2C error code
- * 
+ *
  * @note The DAC register for output range is fixed at 0x01. The data value 0x11
  *       corresponds to 0–10 V mode. Errors are logged using ESP_LOGW.
  */
@@ -48,16 +48,16 @@ inline esphome::i2c::ErrorCode dac_set_output_range(
 
 /**
  * @brief Sets the output voltage of a 15-bit DAC over I2C.
- * 
+ *
  * This function converts a desired voltage (0–10 V) into a 15-bit DAC value
  * and writes it to the DAC using the ESPHome I2C bus. Values are clamped
  * to the DAC range to avoid out-of-bounds output.
- * 
+ *
  * @param bus     Pointer to the ESPHome I2C bus
  * @param address I2C address of the DAC
  * @param volts   Desired output voltage in volts (0.0–10.0 V)
  * @return esphome::i2c::ErrorCode Returns ERROR_OK if successful, otherwise the I2C error code
- * 
+ *
  * @note The function assumes the DAC register for setting voltage is fixed at 0x02
  *       and that the DAC resolution is 15 bits (0–32767). Values outside 0–10 V
  *       are automatically clamped.
@@ -96,11 +96,11 @@ inline esphome::i2c::ErrorCode dac_set_voltage(
 
 /**
  * @brief Routes power to a resistive load via DAC.
- * 
+ *
  * This function calculates the voltage required across the load to consume
  * the same power. It then maps this voltage
  * to a 0–10V DAC output and sends it to the DAC over I2C.
- * 
+ *
  * @param bus                 Pointer to the ESPHome I2C bus
  * @param address             DAC I2C address
  * @param target_power        Power that must be routed (W)
@@ -139,7 +139,7 @@ inline void route_power_to_load(
 
 /**
  * @brief Calculate the target load power using a PID controller to keep grid power at 0 W.
- * 
+ *
  * @param grid_power          Current grid power (W), negative = surplus, positive = from the grid
  * @param target_power_prev   Previous target load power (W), used for PID
  * @param load_max_power      Maximum load power (W)
@@ -153,30 +153,50 @@ inline void route_power_to_load(
  */
 inline float pid_target_load_power(
     float grid_power,
-    float target_power_prev,
+    float target_power_previous,
     float load_max_power,
     float Kp,
     float Ki,
     float Kd,
     float dt,
-    float &integral_prev,
-    float &error_prev)
+    float &anti_windup_integral,
+    float &anti_windup_previous_error)
 {
-    // Setpoint = 0 W (we want returned power to be zero)
-    float error = -grid_power;  // negative grid power = surplus → positive error
-    integral_prev += error * dt;
-    float derivative = (error - error_prev) / dt;
+    // PID setpoint = 0 W (we want grid power returned to zero)
+    float error = -grid_power; // negative grid power = surplus → positive error
+    float derivative = (error - anti_windup_previous_error) / dt;
 
-    float pid_target_load_power = Kp * error + Ki * integral_prev + Kd * derivative;
+    // Compute tentative PID output
+    float output_unsaturated = Kp * error + Ki * anti_windup_integral + Kd * derivative;
 
-    // Clamp pid_target_load_power to 0 or max power
-    if (pid_target_load_power < 0.0f)
-        pid_target_load_power = 0.0f;
-    if (pid_target_load_power > load_max_power)
-        pid_target_load_power = load_max_power;
+    // Anti-windup output limits
+    const float anti_windup_output_min = -300.0f;
+    const float anti_windup_output_max = 4000.0f;
 
-    // Store current error for next update
-    error_prev = error;
+    // Clamp output to anti-windup limits
+    float output = output_unsaturated;
+    if (output > anti_windup_output_max)
+        output = anti_windup_output_max;
+    if (output < anti_windup_output_min)
+        output = anti_windup_output_min;
 
-    return pid_target_load_power;
+    // Anti-windup: only integrate if output is within limits
+    if (output == output_unsaturated)
+    {
+        anti_windup_integral += error * dt;
+    }
+
+    // Recalculate PID output with updated integral
+    output_unsaturated = Kp * error + Ki * anti_windup_integral + Kd * derivative;
+
+    // Final clamp to ensure output stays within limits
+    if (output_unsaturated > anti_windup_output_max)
+        output_unsaturated = anti_windup_output_max;
+    if (output_unsaturated < anti_windup_output_min)
+        output_unsaturated = anti_windup_output_min;
+
+    // Store error for derivative term in next iteration
+    anti_windup_previous_error = error;
+
+    return output_unsaturated;
 }

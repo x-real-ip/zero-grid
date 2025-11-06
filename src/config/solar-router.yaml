@@ -47,9 +47,20 @@ sensor:
     unit_of_measurement: "V"
     internal: true
 
+  # - platform: mqtt_subscribe
+  #   id: grid_power_returned_mqtt
+  #   topic: "dsmr/reading/electricity_currently_returned"
+  #   unit_of_measurement: "W"
+  #   internal: true
+  #   filters:
+  #     - lambda: |-
+  #         float power = x * 1000.0;  // convert kWh to W
+  #         id(grid_power_returned) = power;
+  #         return power;
+
   - platform: mqtt_subscribe
     id: grid_power_returned_mqtt
-    topic: "dsmr/reading/electricity_currently_returned"
+    topic: "test/electricity_currently_returned" # Test Topic
     unit_of_measurement: "W"
     internal: true
     filters:
@@ -73,7 +84,7 @@ sensor:
     name: "Grid Power"
     id: grid_power_sensor
     unit_of_measurement: "W"
-    update_interval: '1s'
+    update_interval: "1s"
     lambda: |-
       float delivered = id(grid_power_delivered);
       float returned  = id(grid_power_returned);
@@ -111,7 +122,7 @@ sensor:
     name: "Target load power"
     id: target_load_power_sensor
     unit_of_measurement: "W"
-    update_interval: '1s'
+    update_interval: "1s"
     lambda: |-
       // Return the value of the global variable
       return id(target_load_power);
@@ -124,7 +135,8 @@ sensor:
   #   internal: true
   #   filters:
   #     - lambda: |-
-  #         id(target_load_power) = power;
+  #         float power = x * 1000.0;  // convert kWh to W
+  #         id(grid_power_returned) = power;
 
   #         if (!id(manual_mode)) {
   #           route_power_to_load(
@@ -199,38 +211,23 @@ globals:
   - id: target_load_power
     type: float
     restore_value: false
-    initial_value: '0.0'
+    initial_value: "0.0"
 
   - id: pid_integral
     type: float
-    restore_value: true
-    initial_value: '0.0'
-    
+    restore_value: false
+    initial_value: "0.0"
+
   - id: pid_error_prev
     type: float
     restore_value: true
-    initial_value: '0.0'
+    initial_value: "0.0"
 
   - id: pid_dt
     type: float
     restore_value: true
-    initial_value: '1.0'
+    initial_value: "1.0"
 
-  - id: pid_Kp
-    type: float
-    restore_value: true
-    initial_value: '0.1'
-
-  - id: pid_Ki
-    type: float
-    restore_value: true
-    initial_value: '0.3'
-
-  - id: pid_Kd
-    type: float
-    restore_value: true
-    initial_value: '0.05'
-    
 switch:
   - platform: template
     name: "Manual mode"
@@ -247,6 +244,33 @@ switch:
           ESP_LOGI("mode", "Auto mode enabled");
 
 number:
+  - platform: template
+    name: "PID Kp"
+    id: pid_Kp
+    optimistic: true
+    min_value: 0.0
+    max_value: 5.0
+    step: 0.01
+    initial_value: 0.5
+
+  - platform: template
+    name: "PID Ki"
+    id: pid_Ki
+    optimistic: true
+    min_value: 0.0
+    max_value: 1.0
+    step: 0.01
+    initial_value: 0.1
+
+  - platform: template
+    name: "PID Kd"
+    id: pid_Kd
+    optimistic: true
+    min_value: 0.0
+    max_value: 0.10
+    step: 0.01
+    initial_value: 0.05
+
   - platform: template
     name: "Load max power setpoint"
     id: load_max_power_setpoint
@@ -299,9 +323,9 @@ interval:
               id(grid_power),
               id(target_load_power),
               id(load_max_power),
-              id(pid_Kp),
-              id(pid_Ki),
-              id(pid_Kd),
+              id(pid_Kp).state,
+              id(pid_Ki).state,
+              id(pid_Kd).state,
               id(pid_dt),
               id(pid_integral),
               id(pid_error_prev)
