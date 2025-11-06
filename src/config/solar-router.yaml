@@ -189,23 +189,24 @@ globals:
     restore_value: false
     initial_value: "0.0"
 
-  - id: load_max_power
+  - id: grid_power
     type: float
-    restore_value: true
+    restore_value: false
     initial_value: "0.0"
 
-  - id: grid_power
+  - id: load_max_power
     type: float
     restore_value: true
     initial_value: "0.0"
 
   - id: load_resistance
     type: float
-    restore_value: no
+    restore_value: true
     initial_value: "26.5"
 
   - id: manual_mode
     type: bool
+    restore_value: false
     initial_value: "false"
 
   - id: target_load_power
