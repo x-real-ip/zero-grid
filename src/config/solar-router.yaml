@@ -82,6 +82,7 @@ sensor:
 
   - platform: template
     name: "Grid Power"
+    icon: mdi:transmission-tower
     id: grid_power_sensor
     unit_of_measurement: "W"
     update_interval: "1s"
@@ -111,73 +112,29 @@ sensor:
   #     return gridpower;
 
   - platform: template
-    name: "Load max power"
-    id: load_max_power_sensor
+    name: "Target load power max"
+    icon: mdi:chart-bell-curve
+    id: target_load_power_max_sensor
     unit_of_measurement: "W"
     lambda: |-
       // Return the value of the global variable
-      return id(load_max_power);
+      return id(target_load_power_max);
 
   - platform: template
-    name: "Target load power"
-    id: target_load_power_sensor
+    name: "PID load power"
+    icon: mdi:chart-bell-curve-cumulative
+    id: pid_load_power_sensor
     unit_of_measurement: "W"
     update_interval: "1s"
     lambda: |-
       // Return the value of the global variable
-      return id(target_load_power);
-
-  # - platform: mqtt_subscribe
-  #   id: grid_power_returned_mqtt
-  #   # topic: "dsmr/reading/electricity_currently_returned"
-  #   topic: "dsmr/reading/electricity_currently_delivered" # Test Topic
-  #   unit_of_measurement: "W"
-  #   internal: true
-  #   filters:
-  #     - lambda: |-
-  #         float power = x * 1000.0;  // convert kWh to W
-  #         id(grid_power_returned) = power;
-
-  #         if (!id(manual_mode)) {
-  #           route_power_to_load(
-  #             id(i2cbus),
-  #             id(dac_addr_reg),
-  #             power,
-  #             id(load_max_power),
-  #             id(load_resistance),
-  #             id(grid_voltage).state
-  #           );
-  #         }
-
-  #         return power;
-
-i2c:
-  sda: 21
-  scl: 22
-  scan: true
-  id: i2cbus
-
-mqtt:
-  broker: "mqtt.lan.stamx.nl"
-  username: !secret mqtt_user
-  password: !secret mqtt_password
-  discovery: false
-
-output:
-  - platform: gpio
-    id: ssr_relay_1
-    pin: 25
+      return id(pid_load_power);
 
 globals:
   - id: dac_addr_reg
     type: uint8_t
     restore_value: false
     initial_value: "0x58"
-
-  - id: dac_duty_cycle_reg
-    type: uint8_t
-    restore_value: false
-    initial_value: "0x02"
 
   - id: grid_power_returned
     type: float
@@ -194,7 +151,7 @@ globals:
     restore_value: false
     initial_value: "0.0"
 
-  - id: load_max_power
+  - id: target_load_power_max
     type: float
     restore_value: true
     initial_value: "0.0"
@@ -208,6 +165,11 @@ globals:
     type: bool
     restore_value: false
     initial_value: "false"
+
+  - id: pid_load_power
+    type: float
+    restore_value: false
+    initial_value: "0.0"
 
   - id: target_load_power
     type: float
@@ -229,9 +191,27 @@ globals:
     restore_value: true
     initial_value: "1.0"
 
+i2c:
+  sda: 21
+  scl: 22
+  scan: true
+  id: i2cbus
+
+mqtt:
+  broker: "mqtt.lan.stamx.nl"
+  username: !secret mqtt_user
+  password: !secret mqtt_password
+  discovery: false
+
+output:
+  - platform: gpio
+    id: ssr_relay_1
+    pin: 25
+
 switch:
   - platform: template
     name: "Manual mode"
+    icon: mdi:cursor-pointer
     id: manual_mode_switch
     restore_mode: "RESTORE_DEFAULT_OFF"
     optimistic: true
@@ -247,6 +227,7 @@ switch:
 number:
   - platform: template
     name: "PID Kp"
+    icon: mdi:chart-bell-curve-cumulative
     id: pid_Kp
     optimistic: true
     min_value: 0.0
@@ -256,6 +237,7 @@ number:
 
   - platform: template
     name: "PID Ki"
+    icon: mdi:chart-bell-curve-cumulative
     id: pid_Ki
     optimistic: true
     min_value: 0.0
@@ -265,6 +247,7 @@ number:
 
   - platform: template
     name: "PID Kd"
+    icon: mdi:chart-bell-curve-cumulative
     id: pid_Kd
     optimistic: true
     min_value: 0.0
@@ -273,57 +256,58 @@ number:
     initial_value: 0.05
 
   - platform: template
-    name: "Load max power setpoint"
-    id: load_max_power_setpoint
+    name: "Target load power max setpoint"
+    id: target_load_power_max_setpoint
     min_value: 0
     max_value: 3680
     step: 1
     optimistic: true
     set_action:
       - lambda: |-
-          id(load_max_power) = x;
-          id(load_max_power_sensor).publish_state(id(load_max_power));
-          ESP_LOGI("router", "Max router power set to %.0f W", x);
+          id(target_load_power_max) = x;
+          id(target_load_power_max_sensor).publish_state(id(target_load_power_max));
+          ESP_LOGI("router", "Max load power set to %.0f W", x);
 
   - platform: template
-    name: "${device_name}_power"
-    id: power
+    name: "Target load power manual"
+    icon: mdi:lightning-bolt
+    id: target_load_power_manual
     min_value: 0
     max_value: 3680
     step: 1
     optimistic: true
     set_action:
       - lambda: |-
-          float power = x;
+          float target_load_power_manual = x;
           if (id(manual_mode)) {
             route_power_to_load(
               id(i2cbus),
               id(dac_addr_reg),
-              power,
-              id(load_max_power),
+              target_load_power_manual,
+              id(target_load_power_max),
               id(load_resistance),
               id(grid_voltage).state
             );
           }
-          id(target_load_power) = power;  // store in global
-          ESP_LOGI("router", "Power set to %.1f W", power);
+          id(pid_load_power) = target_load_power_manual;  // store in global
+          ESP_LOGI("router", "Power set to %.1f W", target_load_power_manual);
 
 interval:
   - interval: 1s
     then:
       - lambda: |-
-          ESP_LOGD("PID", "grid_power=%.1f, target_prev=%.1f, dt=%.1f", id(grid_power), id(target_load_power), id(pid_dt));
+          ESP_LOGD("PID", "grid_power=%.1f, target_prev=%.1f, dt=%.1f", id(grid_power), id(pid_load_power), id(pid_dt));
           ESP_LOGD("PID", "Kp=%.2f, Ki=%.2f, Kd=%.2f", id(pid_Kp), id(pid_Ki), id(pid_Kd));
           ESP_LOGD("PID", "integral_prev=%.1f, error_prev=%.1f", id(pid_integral), id(pid_error_prev));
 
-          if (isnan(id(target_load_power))) id(target_load_power) = 0.0;
+          if (isnan(id(pid_load_power))) id(pid_load_power) = 0.0;
           if (isnan(id(pid_integral))) id(pid_integral) = 0.0;
           if (isnan(id(pid_error_prev))) id(pid_error_prev) = 0.0;
 
-          id(target_load_power) = pid_target_load_power(
+          id(pid_load_power) = pid_target_load_power(
               id(grid_power),
-              id(target_load_power),
-              id(load_max_power),
+              id(pid_load_power),
+              id(target_load_power_max),
               id(pid_Kp).state,
               id(pid_Ki).state,
               id(pid_Kd).state,
