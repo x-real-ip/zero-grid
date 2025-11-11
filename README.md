@@ -6,6 +6,13 @@ The goal: **keep grid power near 0 W** by dynamically adjusting heater load base
 This project is **fully integrated with Home Assistant**  
 all PID parameters (**Kp**, **Ki**, **Kd**) can be **adjusted live** from within Home Assistant using sliders. This allows you to fine-tune the control behavior in real time while monitoring power flow and system response.
 
+---
+
+# ⚠️ WARNING
+
+**This project involves high-voltage AC and electronic circuits. You must have knowledge of electronics and safe handling of mains electricity. Improper use can cause serious injury, death, or property damage.**  
+
+**I am not responsible for any damage, injury, or accidents resulting from the use of this project. Proceed at your own risk.**  
 
 ---
 
