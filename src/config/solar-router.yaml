@@ -1,0 +1,337 @@
+---
+<<: !include common/base.yaml
+
+logger:
+  level: DEBUG
+
+substitutions:
+  device_name: "solar-router"
+  device_comment:
+    "Routes surplus solar power to a heating element to heat water or for space
+    heating"
+
+esphome:
+  name: ${device_name}
+  comment: ${device_comment}
+  includes:
+    - solar-router.h
+  on_boot:
+    priority: -10
+    then:
+      - lambda: |-
+          dac_set_output_range(id(i2cbus), id(dac_addr_reg));
+          dac_set_voltage(id(i2cbus), id(dac_addr_reg), 0.0);
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+button:
+  - <<: !include common/button/restart.yaml
+
+binary_sensor:
+  - <<: !include common/binary_sensor/status.yaml
+
+text_sensor:
+  - <<: !include common/text_sensor/version.yaml
+  - <<: !include common/text_sensor/wifi_info.yaml
+
+sensor:
+  - <<: !include common/sensor/uptime.yaml
+  - <<: !include common/sensor/wifi_signal.yaml
+
+  - platform: dallas_temp
+    address: 0xf800000072419428
+    name: Temperature
+    update_interval: 60s
+
+  - platform: mqtt_subscribe
+    id: grid_voltage
+    topic: "dsmr/reading/phase_voltage_l1"
+    unit_of_measurement: "V"
+    internal: true
+
+  - platform: mqtt_subscribe
+    id: grid_power_returned_mqtt
+    topic: "dsmr/reading/electricity_currently_returned"
+    unit_of_measurement: "W"
+    internal: true
+    filters:
+      - lambda: |-
+          float power = x * 1000.0;  // convert kWh to W
+          id(grid_power_returned) = power;
+          return power;
+
+  # - platform: mqtt_subscribe
+  #   id: grid_power_returned_mqtt
+  #   topic: "test/electricity_currently_returned" # Test Topic
+  #   unit_of_measurement: "W"
+  #   internal: true
+  #   filters:
+  #     - lambda: |-
+  #         float power = x * 1000.0;  // convert kWh to W
+  #         id(grid_power_returned) = power;
+  #         return power;
+
+  - platform: mqtt_subscribe
+    id: grid_power_delivered_mqtt
+    topic: "dsmr/reading/electricity_currently_delivered"
+    unit_of_measurement: "W"
+    internal: true
+    filters:
+      - lambda: |-
+          float power = x * 1000.0;  // convert kWh to W
+          id(grid_power_delivered) = power;
+          return power;
+
+  - platform: template
+    name: "Grid Power"
+    icon: mdi:transmission-tower
+    id: grid_power_sensor
+    unit_of_measurement: "W"
+    update_interval: "500ms"
+    lambda: |-
+      float delivered = id(grid_power_delivered);
+      float returned  = id(grid_power_returned);
+      if (isnan(delivered)) delivered = 0.0;
+      if (isnan(returned)) returned = 0.0;
+
+      float gridpower = delivered - returned;
+      id(grid_power) = gridpower;  // assign to global
+      return gridpower;
+
+  - platform: template
+    name: "Target load power max"
+    icon: mdi:chart-bell-curve
+    id: target_load_power_max_sensor
+    unit_of_measurement: "W"
+    lambda: |-
+      // Return the value of the global variable
+      return id(target_load_power_max);
+
+  - platform: template
+    name: "PID load power"
+    icon: mdi:chart-bell-curve-cumulative
+    id: pid_load_power_sensor
+    unit_of_measurement: "W"
+    update_interval: "1s"
+    lambda: |-
+      // Return the value of the global variable
+      return id(pid_load_power);
+
+globals:
+  - id: dac_addr_reg
+    type: uint8_t
+    restore_value: false
+    initial_value: "0x58"
+
+  - id: grid_power_returned
+    type: float
+    restore_value: false
+    initial_value: "0.0"
+
+  - id: grid_power_delivered
+    type: float
+    restore_value: false
+    initial_value: "0.0"
+
+  - id: grid_power
+    type: float
+    restore_value: false
+    initial_value: "0.0"
+
+  - id: target_load_power_max
+    type: float
+    restore_value: true
+    initial_value: "0.0"
+
+  - id: load_resistance
+    type: float
+    restore_value: true
+    initial_value: "26.5"
+
+  - id: manual_mode
+    type: bool
+    restore_value: false
+    initial_value: "false"
+
+  - id: pid_load_power
+    type: float
+    restore_value: false
+    initial_value: "0.0"
+
+  - id: target_load_power
+    type: float
+    restore_value: false
+    initial_value: "0.0"
+
+  - id: pid_integral
+    type: float
+    restore_value: false
+    initial_value: "0.0"
+
+  - id: pid_error_prev
+    type: float
+    restore_value: true
+    initial_value: "0.0"
+
+  - id: pid_dt
+    type: float
+    restore_value: true
+    initial_value: "1.0"
+
+one_wire:
+  - platform: gpio
+    pin: 4
+
+i2c:
+  sda: 21
+  scl: 22
+  scan: true
+  id: i2cbus
+
+mqtt:
+  broker: "mqtt.lan.stamx.nl"
+  username: !secret mqtt_user
+  password: !secret mqtt_password
+  discovery: false
+
+switch:
+  - platform: gpio
+    name: "Bypass relay"
+    icon: mdi:arrow-u-down-left
+    id: bypass_relay
+    pin: GPIO33
+    restore_mode: ALWAYS_OFF
+
+  - platform: template
+    name: "Manual mode"
+    icon: mdi:cursor-pointer
+    id: manual_mode_switch
+    restore_mode: "RESTORE_DEFAULT_OFF"
+    optimistic: true
+    turn_on_action:
+      - lambda: |-
+          id(manual_mode) = true;
+          ESP_LOGI("mode", "Manual mode enabled");
+    turn_off_action:
+      - lambda: |-
+          id(manual_mode) = false;
+          ESP_LOGI("mode", "Auto mode enabled");
+
+number:
+  - platform: template
+    name: "PID Kp"
+    icon: mdi:chart-bell-curve-cumulative
+    id: pid_Kp
+    optimistic: true
+    min_value: 0.0
+    max_value: 5.0
+    step: 0.1
+    initial_value: 0.1
+
+  - platform: template
+    name: "PID Ki"
+    icon: mdi:chart-bell-curve-cumulative
+    id: pid_Ki
+    optimistic: true
+    min_value: 0.0
+    max_value: 0.5
+    step: 0.1
+    initial_value: 0.3
+
+  - platform: template
+    name: "PID Kd"
+    icon: mdi:chart-bell-curve-cumulative
+    id: pid_Kd
+    optimistic: true
+    min_value: 0.00
+    max_value: 0.10
+    step: 0.01
+    initial_value: 0.05
+
+  - platform: template
+    name: "Target load power max setpoint"
+    id: target_load_power_max_setpoint
+    min_value: 0
+    max_value: 3680
+    step: 1
+    optimistic: true
+    set_action:
+      - lambda: |-
+          id(target_load_power_max) = x;
+          id(target_load_power_max_sensor).publish_state(id(target_load_power_max));
+          ESP_LOGI("router", "Max load power set to %.0f W", x);
+
+  - platform: template
+    name: "Target load power manual"
+    icon: mdi:lightning-bolt
+    id: target_load_power_manual
+    min_value: 0
+    max_value: 3680
+    step: 1
+    optimistic: true
+    set_action:
+      - lambda: |-
+          float target_load_power_manual = x;
+          if (id(manual_mode)) {
+            route_power_to_load(
+              id(i2cbus),
+              id(dac_addr_reg),
+              target_load_power_manual,
+              id(target_load_power_max),
+              id(load_resistance),
+              id(grid_voltage).state
+            );
+          }
+          id(pid_load_power) = target_load_power_manual;  // store in global
+          ESP_LOGI("router", "Power set to %.1f W", target_load_power_manual);
+
+interval:
+  - interval: 200ms
+    then:
+      - lambda: |-
+          ESP_LOGD("PID", "grid_power=%.1f, target_prev=%.1f, dt=%.1f", id(grid_power), id(pid_load_power), id(pid_dt));
+          ESP_LOGD("PID", "Kp=%.2f, Ki=%.2f, Kd=%.2f", id(pid_Kp).state, id(pid_Ki).state, id(pid_Kd).state);
+          ESP_LOGD("PID", "integral_prev=%.1f, error_prev=%.1f", id(pid_integral), id(pid_error_prev));
+          
+          if (isnan(id(pid_load_power))) id(pid_load_power) = 0.0;
+          if (isnan(id(pid_integral))) id(pid_integral) = 0.0;
+          if (isnan(id(pid_error_prev))) id(pid_error_prev) = 0.0;
+
+          if (!id(manual_mode)) {
+            id(pid_load_power) = pid_target_load_power(
+                id(grid_power),
+                id(pid_load_power),
+                id(target_load_power_max),
+                id(pid_Kp).state,
+                id(pid_Ki).state,
+                id(pid_Kd).state,
+                id(pid_dt),
+                id(pid_integral),
+                id(pid_error_prev)
+            );
+
+            // Send PID result to DAC
+            route_power_to_load(
+              id(i2cbus),
+              id(dac_addr_reg),
+              id(pid_load_power),
+              id(target_load_power_max),
+              id(load_resistance),
+              id(grid_voltage).state
+            );
+
+            // Bypass Relay automatic control
+            float surplus = -id(grid_power);
+            if (surplus < 0.0f) surplus = 0.0f;
+            float max_power = id(target_load_power_max);
+            if (surplus >= max_power) {
+              id(bypass_relay).turn_on();
+              ESP_LOGI("bypass", "Bypass ON (%.0f W surplus >= %.0f W max)", surplus, max_power);
+            } else {
+              id(bypass_relay).turn_off();
+              ESP_LOGI("bypass", "Bypass OFF (%.0f W surplus < %.0f W max)", surplus, max_power);
+            }
+          }
