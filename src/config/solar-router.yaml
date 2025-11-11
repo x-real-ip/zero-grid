@@ -41,26 +41,20 @@ sensor:
   - <<: !include common/sensor/uptime.yaml
   - <<: !include common/sensor/wifi_signal.yaml
 
+  - platform: dallas_temp
+    address: 0xf800000072419428
+    name: Temperature
+    update_interval: 60s
+
   - platform: mqtt_subscribe
     id: grid_voltage
     topic: "dsmr/reading/phase_voltage_l1"
     unit_of_measurement: "V"
     internal: true
 
-  # - platform: mqtt_subscribe
-  #   id: grid_power_returned_mqtt
-  #   topic: "dsmr/reading/electricity_currently_returned"
-  #   unit_of_measurement: "W"
-  #   internal: true
-  #   filters:
-  #     - lambda: |-
-  #         float power = x * 1000.0;  // convert kWh to W
-  #         id(grid_power_returned) = power;
-  #         return power;
-
   - platform: mqtt_subscribe
     id: grid_power_returned_mqtt
-    topic: "test/electricity_currently_returned" # Test Topic
+    topic: "dsmr/reading/electricity_currently_returned"
     unit_of_measurement: "W"
     internal: true
     filters:
@@ -68,6 +62,17 @@ sensor:
           float power = x * 1000.0;  // convert kWh to W
           id(grid_power_returned) = power;
           return power;
+
+  # - platform: mqtt_subscribe
+  #   id: grid_power_returned_mqtt
+  #   topic: "test/electricity_currently_returned" # Test Topic
+  #   unit_of_measurement: "W"
+  #   internal: true
+  #   filters:
+  #     - lambda: |-
+  #         float power = x * 1000.0;  // convert kWh to W
+  #         id(grid_power_returned) = power;
+  #         return power;
 
   - platform: mqtt_subscribe
     id: grid_power_delivered_mqtt
@@ -95,21 +100,6 @@ sensor:
       float gridpower = delivered - returned;
       id(grid_power) = gridpower;  // assign to global
       return gridpower;
-
-  # - platform: template
-  #   name: "Grid Power (test)"
-  #   id: grid_power_sensor
-  #   unit_of_measurement: "W"
-  #   update_interval: '1s'
-  #   lambda: |-
-  #     float delivered = id(grid_power_delivered);
-  #     float returned  = id(grid_power_returned);
-  #     if (isnan(delivered)) delivered = 0.0;
-  #     if (isnan(returned)) returned = 0.0;
-
-  #     float gridpower = returned - delivered;
-  #     id(grid_power) = gridpower;  // assign to global
-  #     return gridpower;
 
   - platform: template
     name: "Target load power max"
@@ -191,6 +181,10 @@ globals:
     restore_value: true
     initial_value: "1.0"
 
+one_wire:
+  - platform: gpio
+    pin: 4
+
 i2c:
   sda: 21
   scl: 22
@@ -202,11 +196,6 @@ mqtt:
   username: !secret mqtt_user
   password: !secret mqtt_password
   discovery: false
-
-output:
-  - platform: gpio
-    id: ssr_relay_1
-    pin: 25
 
 switch:
   - platform: gpio
@@ -239,8 +228,8 @@ number:
     optimistic: true
     min_value: 0.0
     max_value: 5.0
-    step: 0.01
-    initial_value: 0.5
+    step: 0.1
+    initial_value: 0.1
 
   - platform: template
     name: "PID Ki"
@@ -248,16 +237,16 @@ number:
     id: pid_Ki
     optimistic: true
     min_value: 0.0
-    max_value: 1.0
-    step: 0.01
-    initial_value: 0.1
+    max_value: 0.5
+    step: 0.1
+    initial_value: 0.3
 
   - platform: template
     name: "PID Kd"
     icon: mdi:chart-bell-curve-cumulative
     id: pid_Kd
     optimistic: true
-    min_value: 0.0
+    min_value: 0.00
     max_value: 0.10
     step: 0.01
     initial_value: 0.05
@@ -300,13 +289,13 @@ number:
           ESP_LOGI("router", "Power set to %.1f W", target_load_power_manual);
 
 interval:
-  - interval: 1s
+  - interval: 200ms
     then:
       - lambda: |-
           ESP_LOGD("PID", "grid_power=%.1f, target_prev=%.1f, dt=%.1f", id(grid_power), id(pid_load_power), id(pid_dt));
-          ESP_LOGD("PID", "Kp=%.2f, Ki=%.2f, Kd=%.2f", id(pid_Kp), id(pid_Ki), id(pid_Kd));
+          ESP_LOGD("PID", "Kp=%.2f, Ki=%.2f, Kd=%.2f", id(pid_Kp).state, id(pid_Ki).state, id(pid_Kd).state);
           ESP_LOGD("PID", "integral_prev=%.1f, error_prev=%.1f", id(pid_integral), id(pid_error_prev));
-
+          
           if (isnan(id(pid_load_power))) id(pid_load_power) = 0.0;
           if (isnan(id(pid_integral))) id(pid_integral) = 0.0;
           if (isnan(id(pid_error_prev))) id(pid_error_prev) = 0.0;
