@@ -5,7 +5,7 @@ logger:
   level: DEBUG
 
 substitutions:
-  device_name: "solar-router"
+  device_name: "zero-grid"
   device_comment:
     "Routes surplus solar power to a heating element to heat water or for space
     heating"
@@ -14,7 +14,7 @@ esphome:
   name: ${device_name}
   comment: ${device_comment}
   includes:
-    - solar-router.h
+    - zero-grid.h
   on_boot:
     priority: -10
     then:

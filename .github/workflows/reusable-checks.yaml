@@ -1,0 +1,32 @@
+---
+name: Reusable Checks
+
+on:
+  workflow_call:
+
+jobs:
+  yamllint:
+    name: Yaml lint
+    uses: x-real-ip/github-actions/.github/workflows/yamllint.yaml@main
+
+  test_configs:
+    name: Test configs with ESPHome
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        version: [latest, beta]
+    container:
+      image: esphome/esphome:${{ matrix.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Prepare secrets file
+        run: mv ./src/config/secrets.yaml.example ./src/config/secrets.yaml
+
+      - name: Test esp configs (${{ matrix.version }})
+        run: |
+          cd ./src/
+          for file in $(find config -maxdepth 1 -type f -name "*.yaml" -not -name "secrets.yaml"); do
+            esphome config "$file"
+          done
