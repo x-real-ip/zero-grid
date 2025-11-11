@@ -3,6 +3,10 @@
 Routes surplus solar power to a heating element using an ESP32 and a PID controller.  
 The goal: **keep grid power near 0 W** by dynamically adjusting heater load based on live grid readings.
 
+This project is **fully integrated with Home Assistant**  
+all PID parameters (**Kp**, **Ki**, **Kd**) can be **adjusted live** from within Home Assistant using sliders. This allows you to fine-tune the control behavior in real time while monitoring power flow and system response.
+
+
 ---
 
 ## ⚙️ Features
