@@ -22,6 +22,9 @@ jobs:
           yaml-file: esphome/zero-grid.yaml # Replace with your YAML filename
           version: latest
 
+      - name: Prepare secrets file
+        run: mv esphome/secrets.yaml.example esphome/secrets.yaml
+
       - name: Copy firmware files
         run: |
           mkdir -p release-files
