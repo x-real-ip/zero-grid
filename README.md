@@ -1,3 +1,5 @@
+[![Build and Release ESP32 Firmware](https://github.com/x-real-ip/zero-grid/actions/workflows/auto-release.yaml/badge.svg)](https://github.com/x-real-ip/zero-grid/actions/workflows/auto-release.yaml)
+
 # zero-grid
 
 Routes surplus solar power to a heating element using an ESP32. 
