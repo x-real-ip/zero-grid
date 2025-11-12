@@ -66,6 +66,18 @@ substitutions:
     "Routes surplus solar power to a heating element to heat water or for space
     heating"
 
+esphome:
+  name: ${device_name}
+  comment: ${device_comment}
+  includes:
+    - zero-grid.h
+  on_boot:
+    priority: -10
+    then:
+      - lambda: |-
+          dac_set_output_range(id(i2cbus), id(dac_addr_reg));
+          dac_set_voltage(id(i2cbus), id(dac_addr_reg), 0.0);
+
 logger:
   level: DEBUG
 
@@ -94,18 +106,6 @@ wifi:
   ap:
     ssid: ${device_name}_ap
     password: !secret wifi_password
-
-esphome:
-  name: ${device_name}
-  comment: ${device_comment}
-  includes:
-    - zero-grid.h
-  on_boot:
-    priority: -10
-    then:
-      - lambda: |-
-          dac_set_output_range(id(i2cbus), id(dac_addr_reg));
-          dac_set_voltage(id(i2cbus), id(dac_addr_reg), 0.0);
 
 esp32:
   board: esp32dev
