@@ -14,16 +14,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # For ESPHome projects
+      - name: Prepare secrets file
+        run: mv esphome/secrets.yaml.example esphome/secrets.yaml
+
       - name: Build ESPHome firmware
         uses: esphome/build-action@v7
-        id: esphome-build
+        id: build
         with:
           yaml-file: esphome/zero-grid.yaml # Replace with your YAML filename
           version: latest
-
-      - name: Prepare secrets file
-        run: mv esphome/secrets.yaml.example esphome/secrets.yaml
 
       - name: Copy firmware files
         run: |
