@@ -27,15 +27,6 @@ jobs:
           yaml-file: esphome/zero-grid.yaml # Replace with your YAML filename
           version: latest
 
-      - name: Create GitHub Release
-        id: create_release
-        uses: release-drafter/release-drafter@v6
-        with:
-          config-name: release-drafter.yaml
-          publish: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Upload firmware assets
         uses: softprops/action-gh-release@v2
         with:
