@@ -1,125 +1,4 @@
 ---
-<<: !include common/base.yaml
-
-logger:
-  level: DEBUG
-
-substitutions:
-  device_name: "zero-grid"
-  device_comment:
-    "Routes surplus solar power to a heating element to heat water or for space
-    heating"
-
-esphome:
-  name: ${device_name}
-  comment: ${device_comment}
-  includes:
-    - zero-grid.h
-  on_boot:
-    priority: -10
-    then:
-      - lambda: |-
-          dac_set_output_range(id(i2cbus), id(dac_addr_reg));
-          dac_set_voltage(id(i2cbus), id(dac_addr_reg), 0.0);
-
-esp32:
-  board: esp32dev
-  framework:
-    type: esp-idf
-
-button:
-  - <<: !include common/button/restart.yaml
-
-binary_sensor:
-  - <<: !include common/binary_sensor/status.yaml
-
-text_sensor:
-  - <<: !include common/text_sensor/version.yaml
-  - <<: !include common/text_sensor/wifi_info.yaml
-
-sensor:
-  - <<: !include common/sensor/uptime.yaml
-  - <<: !include common/sensor/wifi_signal.yaml
-
-  - platform: dallas_temp
-    address: 0xf800000072419428
-    name: Temperature
-    update_interval: 60s
-
-  - platform: mqtt_subscribe
-    id: grid_voltage
-    topic: "dsmr/reading/phase_voltage_l1"
-    unit_of_measurement: "V"
-    internal: true
-
-  - platform: mqtt_subscribe
-    id: grid_power_returned_mqtt
-    topic: "dsmr/reading/electricity_currently_returned"
-    unit_of_measurement: "W"
-    internal: true
-    filters:
-      - lambda: |-
-          float power = x * 1000.0;  // convert kWh to W
-          id(grid_power_returned) = power;
-          return power;
-
-  # - platform: mqtt_subscribe
-  #   id: grid_power_returned_mqtt
-  #   topic: "test/electricity_currently_returned" # Test Topic
-  #   unit_of_measurement: "W"
-  #   internal: true
-  #   filters:
-  #     - lambda: |-
-  #         float power = x * 1000.0;  // convert kWh to W
-  #         id(grid_power_returned) = power;
-  #         return power;
-
-  - platform: mqtt_subscribe
-    id: grid_power_delivered_mqtt
-    topic: "dsmr/reading/electricity_currently_delivered"
-    unit_of_measurement: "W"
-    internal: true
-    filters:
-      - lambda: |-
-          float power = x * 1000.0;  // convert kWh to W
-          id(grid_power_delivered) = power;
-          return power;
-
-  - platform: template
-    name: "Grid Power"
-    icon: mdi:transmission-tower
-    id: grid_power_sensor
-    unit_of_measurement: "W"
-    update_interval: "500ms"
-    lambda: |-
-      float delivered = id(grid_power_delivered);
-      float returned  = id(grid_power_returned);
-      if (isnan(delivered)) delivered = 0.0;
-      if (isnan(returned)) returned = 0.0;
-
-      float gridpower = delivered - returned;
-      id(grid_power) = gridpower;  // assign to global
-      return gridpower;
-
-  - platform: template
-    name: "Target load power max"
-    icon: mdi:chart-bell-curve
-    id: target_load_power_max_sensor
-    unit_of_measurement: "W"
-    lambda: |-
-      // Return the value of the global variable
-      return id(target_load_power_max);
-
-  - platform: template
-    name: "PID load power"
-    icon: mdi:chart-bell-curve-cumulative
-    id: pid_load_power_sensor
-    unit_of_measurement: "W"
-    update_interval: "1s"
-    lambda: |-
-      // Return the value of the global variable
-      return id(pid_load_power);
-
 globals:
   - id: dac_addr_reg
     type: uint8_t
@@ -180,6 +59,155 @@ globals:
     type: float
     restore_value: true
     initial_value: "1.0"
+
+substitutions:
+  device_name: "zero-grid"
+  device_comment:
+    "Routes surplus solar power to a heating element to heat water or for space
+    heating"
+
+logger:
+  level: DEBUG
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+  reboot_timeout: "15min"
+
+captive_portal:
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+
+web_server:
+  port: 80
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  domain: !secret wifi_domain
+  ap:
+    ssid: ${device_name}_ap
+    password: !secret wifi_password
+
+esphome:
+  name: ${device_name}
+  comment: ${device_comment}
+  includes:
+    - zero-grid.h
+  on_boot:
+    priority: -10
+    then:
+      - lambda: |-
+          dac_set_output_range(id(i2cbus), id(dac_addr_reg));
+          dac_set_voltage(id(i2cbus), id(dac_addr_reg), 0.0);
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+button:
+  - platform: restart
+    name: ${device_name}_restart
+
+binary_sensor:
+  - platform: status
+    name: ${device_name}_status
+
+text_sensor:
+  - platform: version
+    name: ${device_name}_version
+  - platform: wifi_info
+    ip_address:
+      name: ${device_name}_wifi_ip
+    ssid:
+      name: ${device_name}_wifi_ssid
+    bssid:
+      name: ${device_name}_wifi_bssid
+
+sensor:
+  - platform: uptime
+    name: ${device_name}_uptime
+
+  - platform: wifi_signal
+    name: ${device_name}_wifi_signal
+    id: wifi_signal_db
+    update_interval: 60s
+    entity_category: "diagnostic"
+
+  - platform: dallas_temp
+    address: 0xf800000072419428
+    name: Temperature
+    update_interval: 60s
+
+  - platform: mqtt_subscribe
+    id: grid_voltage
+    topic: "dsmr/reading/phase_voltage_l1"
+    unit_of_measurement: "V"
+    internal: true
+
+  - platform: mqtt_subscribe
+    id: grid_power_returned_mqtt
+    topic: "dsmr/reading/electricity_currently_returned"
+    unit_of_measurement: "W"
+    internal: true
+    filters:
+      - lambda: |-
+          float power = x * 1000.0;  // convert kWh to W
+          id(grid_power_returned) = power;
+          return power;
+
+  - platform: mqtt_subscribe
+    id: grid_power_delivered_mqtt
+    topic: "dsmr/reading/electricity_currently_delivered"
+    unit_of_measurement: "W"
+    internal: true
+    filters:
+      - lambda: |-
+          float power = x * 1000.0;  // convert kWh to W
+          id(grid_power_delivered) = power;
+          return power;
+
+  - platform: template
+    name: "Grid Power"
+    icon: mdi:transmission-tower
+    id: grid_power_sensor
+    unit_of_measurement: "W"
+    update_interval: "500ms"
+    lambda: |-
+      float delivered = id(grid_power_delivered);
+      float returned  = id(grid_power_returned);
+      if (isnan(delivered)) delivered = 0.0;
+      if (isnan(returned)) returned = 0.0;
+
+      float gridpower = delivered - returned;
+      id(grid_power) = gridpower;  // assign to global
+      return gridpower;
+
+  - platform: template
+    name: "Target load power max"
+    icon: mdi:chart-bell-curve
+    id: target_load_power_max_sensor
+    unit_of_measurement: "W"
+    lambda: |-
+      // Return the value of the global variable
+      return id(target_load_power_max);
+
+  - platform: template
+    name: "PID load power"
+    icon: mdi:chart-bell-curve-cumulative
+    id: pid_load_power_sensor
+    unit_of_measurement: "W"
+    update_interval: "1s"
+    lambda: |-
+      // Return the value of the global variable
+      return id(pid_load_power);
 
 one_wire:
   - platform: gpio
@@ -295,7 +323,7 @@ interval:
           ESP_LOGD("PID", "grid_power=%.1f, target_prev=%.1f, dt=%.1f", id(grid_power), id(pid_load_power), id(pid_dt));
           ESP_LOGD("PID", "Kp=%.2f, Ki=%.2f, Kd=%.2f", id(pid_Kp).state, id(pid_Ki).state, id(pid_Kd).state);
           ESP_LOGD("PID", "integral_prev=%.1f, error_prev=%.1f", id(pid_integral), id(pid_error_prev));
-          
+
           if (isnan(id(pid_load_power))) id(pid_load_power) = 0.0;
           if (isnan(id(pid_integral))) id(pid_integral) = 0.0;
           if (isnan(id(pid_error_prev))) id(pid_error_prev) = 0.0;
