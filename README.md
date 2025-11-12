@@ -32,7 +32,7 @@ all PID parameters (**Kp**, **Ki**, **Kd**) can be **adjusted live** from within
 
 ## 🪜 How it works
 
-1. **Grid power** is measured via MQTT (delivered – returned).  
+1. **Grid power** is measured via MQTT (delivered - returned).  
 2. The **PID controller** adjusts the **target load power** so that grid power → 0 W.  
 3. The **DAC output** generates a voltage (0–10 V) proportional to desired heater power.  
 4. The external **voltage regulator** translates that DAC signal to an AC output for the heater.  
@@ -49,8 +49,8 @@ all PID parameters (**Kp**, **Ki**, **Kd**) can be **adjusted live** from within
 | **Kd** | Derivative gain | Dampens fast changes; helps stabilize |
 
 **Target behavior:**  
-> If grid power is **negative** (exporting), increase heater power.  
-> If grid power is **positive** (importing), decrease heater power.  
+> If grid power is **negative** (exporting), increase the load.  
+> If grid power is **positive** (importing), decrease the load.  
 
 ---
 
