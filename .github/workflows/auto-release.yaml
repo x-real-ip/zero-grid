@@ -39,7 +39,7 @@ jobs:
       - name: Upload firmware assets
         uses: softprops/action-gh-release@v2
         with:
-          draft: true
+          draft: false
           tag_name: ${{ github.ref_name }}
           files: |
             zero-grid-esp32/zero-grid-esp32-${{ github.ref_name }}.factory.bin
