@@ -22,11 +22,11 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Prepare secrets file
-        run: mv ./src/config/secrets.yaml.example ./src/config/secrets.yaml
+        run: mv esphome/secrets.yaml.example esphome/secrets.yaml
 
       - name: Test esp configs (${{ matrix.version }})
         run: |
-          cd ./src/
+          cd esphome/
           for file in $(find config -maxdepth 1 -type f -name "*.yaml" -not -name "secrets.yaml"); do
             esphome config "$file"
           done

@@ -15,7 +15,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Prepare secrets file
         run: mv esphome/secrets.yaml.example esphome/secrets.yaml
@@ -24,8 +24,17 @@ jobs:
         uses: esphome/build-action@v7
         id: build
         with:
-          yaml-file: esphome/zero-grid.yaml # Replace with your YAML filename
+          yaml-file: esphome/zero-grid.yaml
           version: latest
+
+      - name: Rename firmware files with version
+        run: |
+          VERSION=${GITHUB_REF_NAME}
+          echo "Renaming files with version: $VERSION"
+          mv zero-grid-esp32/zero-grid-esp32.factory.bin zero-grid-esp32/zero-grid-esp32-${VERSION}.factory.bin
+          mv zero-grid-esp32/zero-grid-esp32.ota.bin zero-grid-esp32/zero-grid-esp32-${VERSION}.ota.bin
+          mv zero-grid-esp32/zero-grid-esp32.elf zero-grid-esp32/zero-grid-esp32-${VERSION}.elf
+          mv zero-grid-esp32/manifest.json zero-grid-esp32/manifest-${VERSION}.json
 
       - name: Upload firmware assets
         uses: softprops/action-gh-release@v2
@@ -33,9 +42,9 @@ jobs:
           draft: true
           tag_name: ${{ github.ref_name }}
           files: |
-            zero-grid-esp32/zero-grid-esp32.factory.bin
-            zero-grid-esp32/zero-grid-esp32.ota.bin
-            zero-grid-esp32/zero-grid-esp32.elf
-            zero-grid-esp32/manifest.json
+            zero-grid-esp32/zero-grid-esp32-${{ github.ref_name }}.factory.bin
+            zero-grid-esp32/zero-grid-esp32-${{ github.ref_name }}.ota.bin
+            zero-grid-esp32/zero-grid-esp32-${{ github.ref_name }}.elf
+            zero-grid-esp32/manifest-${{ github.ref_name }}.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
