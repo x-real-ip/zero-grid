@@ -1,24 +1,5 @@
 ---
 globals:
-  - id: dac_addr_reg
-    type: uint8_t
-    restore_value: false
-    initial_value: "0x58"
-
-  - id: grid_power_returned
-    type: float
-    restore_value: false
-    initial_value: "0.0"
-
-  - id: grid_power_delivered
-    type: float
-    restore_value: false
-    initial_value: "0.0"
-
-  - id: grid_power
-    type: float
-    restore_value: false
-    initial_value: "0.0"
 
   - id: target_load_power_max
     type: float
@@ -28,7 +9,7 @@ globals:
   - id: load_resistance
     type: float
     restore_value: true
-    initial_value: "26.5"
+    initial_value: "0.0"
 
   - id: manual_mode
     type: bool
@@ -52,13 +33,33 @@ globals:
 
   - id: pid_error_prev
     type: float
-    restore_value: true
+    restore_value: false
     initial_value: "0.0"
 
   - id: pid_dt
     type: float
     restore_value: true
     initial_value: "1.0"
+
+  - id: dac_addr_reg
+    type: uint8_t
+    restore_value: false
+    initial_value: "0x58"
+
+  - id: grid_power_returned
+    type: float
+    restore_value: false
+    initial_value: "0.0"
+
+  - id: grid_power_delivered
+    type: float
+    restore_value: false
+    initial_value: "0.0"
+
+  - id: grid_power
+    type: float
+    restore_value: false
+    initial_value: "0.0"
 
 substitutions:
   device_name: "zero-grid"
@@ -281,6 +282,20 @@ number:
     step: 0.01
     initial_value: 0.05
     restore_value: true
+
+  - platform: template
+    name: "Load Resistance"
+    id: load_resistance_number
+    unit_of_measurement: "Ω"
+    min_value: 10.0
+    max_value: 100.0
+    step: 0.1
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          id(load_resistance) = x;
+          ESP_LOGI("config", "Load resistance set to %.2f Ω", x);
 
   - platform: template
     name: "Target load power max setpoint"
