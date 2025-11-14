@@ -35,6 +35,8 @@ jobs:
           mv zero-grid-esp32/zero-grid-esp32.ota.bin zero-grid-esp32/zero-grid-esp32-${VERSION}.ota.bin
           mv zero-grid-esp32/zero-grid-esp32.elf zero-grid-esp32/zero-grid-esp32-${VERSION}.elf
           mv zero-grid-esp32/manifest.json zero-grid-esp32/manifest-${VERSION}.json
+          mv esphome/zero-grid.yaml zero-grid-esp32/zero-grid-esp32-${VERSION}.yaml
+          mv esphome/zero-grid.h zero-grid-esp32/zero-grid-esp32-${VERSION}.h
 
       - name: Upload firmware assets
         uses: softprops/action-gh-release@v2
@@ -46,5 +48,7 @@ jobs:
             zero-grid-esp32/zero-grid-esp32-${{ github.ref_name }}.ota.bin
             zero-grid-esp32/zero-grid-esp32-${{ github.ref_name }}.elf
             zero-grid-esp32/manifest-${{ github.ref_name }}.json
+            zero-grid-esp32/zero-grid-esp32-${VERSION}.yaml
+            zero-grid-esp32/zero-grid-esp32-${VERSION}.h
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
