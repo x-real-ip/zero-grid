@@ -340,7 +340,7 @@ number:
     set_action:
       - lambda: |-
           float target_load_power_manual = x;
-          if (id(manual_mode)) {
+          if (id(manual_mode) && id(routing_enabled)) {
             route_power_to_load(
               id(i2cbus),
               id(dac_addr_reg),
@@ -349,6 +349,8 @@ number:
               id(load_resistance),
               id(grid_voltage).state
             );
+          } else {
+            ESP_LOGI("router", "Routing disabled or not in manual mode; stored value %.1f W", target_load_power_manual);
           }
           id(pid_load_power) = target_load_power_manual;  // store in global
           ESP_LOGI("router", "Power set to %.1f W", target_load_power_manual);
