@@ -472,7 +472,8 @@ ota_password: "YOUR_OTA_PASSWORD"
 api_encryption_key: "YOUR_API_KEY"
 ```
 
-> [!IMPORTANT] Never commit your secrets.yaml to a public repository.
+> [!IMPORTANT] 
+> Never commit your secrets.yaml to a public repository.
 
 ### 2. Add the Project to ESPHome Dashboard
 
