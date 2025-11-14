@@ -6,10 +6,14 @@ Routes surplus solar power to a heating element using an ESP32. The goal: **keep
 grid power near 0 W** by dynamically adjusting heater load based on live grid
 readings.
 
-> [!CAUTION]
-> This project involves high-voltage AC and electronic circuits. You must have knowledge of electronics and safe handling of mains electricity. Improper use can cause serious injury, death, or property damage. I am not responsible for any damage, injury, or accidents resulting from the use of this project. Proceed at your own risk.
+> [!CAUTION] This project involves high-voltage AC and electronic circuits. You
+> must have knowledge of electronics and safe handling of mains electricity.
+> Improper use can cause serious injury, death, or property damage. I am not
+> responsible for any damage, injury, or accidents resulting from the use of
+> this project. Proceed at your own risk.
 
 - [zero-grid](#zero-grid)
+  - [Motivation / Background](#motivation--background)
   - [Features](#features)
   - [How it works](#how-it-works)
     - [Deeper Explanation](#deeper-explanation)
@@ -17,6 +21,12 @@ readings.
       - [Why use PID control?](#why-use-pid-control)
       - [What the DAC and voltage regulator actually do](#what-the-dac-and-voltage-regulator-actually-do)
       - [Why the bypass relay exists](#why-the-bypass-relay-exists)
+  - [Home Assistant Entities](#home-assistant-entities)
+    - [Power \& Sensor Entities](#power--sensor-entities)
+    - [Control Entities](#control-entities)
+    - [PID Tuning Entities](#pid-tuning-entities)
+    - [Target Load Power Entities](#target-load-power-entities)
+    - [Diagnostic Entities](#diagnostic-entities)
   - [PID Control](#pid-control)
     - [Adjusting the PID Controller in Home Assistant](#adjusting-the-pid-controller-in-home-assistant)
       - [Where to find the sliders](#where-to-find-the-sliders)
@@ -28,6 +38,8 @@ readings.
       - [Live Monitoring](#live-monitoring)
       - [Goal](#goal)
   - [Hardware](#hardware)
+    - [Pinout](#pinout)
+    - [Wiring](#wiring)
   - [MQTT Topics](#mqtt-topics)
   - [ESPHome Configuration](#esphome-configuration)
   - [Downsides and Considerations](#downsides-and-considerations)
@@ -42,6 +54,26 @@ This project is based on ESPHome and **fully integrated with Home Assistant**
 
 ![Zero-Grid wiring diagram](docs/images/input.png)
 ![Zero-Grid wiring diagram](docs/images/sensors.png)
+
+## Motivation / Background
+
+In the **Netherlands**, the **net metering scheme (“salderingsregeling”)**
+currently allows solar panel owners to offset their electricity consumption with
+self-generated solar power.
+
+However, this scheme will **end on January 1, 2027**:
+
+- Solar owners will **no longer be able to fully offset their electricity
+  usage** with self-generated power.
+- They will receive a **small compensation** for feeding excess electricity back
+  to the grid.
+
+As a result, it becomes increasingly important to **use solar energy locally**
+instead of exporting it.
+
+The **Zero-Grid project was created to address this challenge**: it dynamically
+routes surplus solar power to a heater or other resistive loads, **keeping grid
+import/export near zero** and maximizing self-consumption.
 
 ---
 
@@ -142,17 +174,80 @@ industrial “0–10 V control” dimmers and regulators.
 
 #### Why the bypass relay exists
 
-When solar production **exceeds the maximum adjustable heater power**, the
-DAC-controlled regulator cannot use the surplus completely. In these cases:
+The bypass relay is included because running the voltage regulator at **100%
+output is pointless**.  
+At full duty the regulator no longer regulates-it simply acts as a resistive,
+lossy device in the power path.
 
-- The bypass relay turns on
-- The heater runs at **full power**
-- The controller still stabilizes the remaining surplus using the PID loop
+To avoid unnecessary heat, losses, and inefficiency:
 
-This ensures **all available solar energy is used** without wasting it back to
-the grid.
+- When the PID output requests **full power**, the bypass relay engages.
+- The heater is then connected **directly to mains**, skipping the voltage
+  regulator entirely.
+- This gives the same 100% heater power, but **without forcing the regulator to
+  operate at its inefficient limit**.
+- For all partial-power situations, the regulator + DAC combination takes over
+  again.
+
+The relay ensures that the system uses the regulator **only when modulation is
+needed** and bypasses it whenever the heater should run at full power.
 
 ---
+
+## Home Assistant Entities
+
+This project integrates tightly with Home Assistant.  
+All important measurements, controls, and tuning parameters are exposed as
+entities so you can monitor the system and adjust behavior _without reflashing
+the ESP32_.
+
+Below is an overview of all entities and what they are used for.
+
+### Power & Sensor Entities
+
+| Entity                                      | Type          | Purpose                                                                                                                               |
+| ------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `sensor.solar_router_grid_power`            | Sensor (W)    | Real-time grid import/export. Positive = consumption, negative = export. This is the primary PID input.                               |
+| `sensor.solar_router_pid_load_power`        | Sensor (W)    | The PID output calculated power currently being sent to the heater.                                                                   |
+| `sensor.solar_router_target_load_power_max` | Sensor (W)    | The maximum power that can be send to the heater (set by ).                                                                           |
+| `sensor.solar_router_temperature`           | Sensor (°C)   | Measures temperature via the DS18B20 sensor. Can be used to monitor heater, water, or ambient temperature for diagnostics or logging. |
+| 🛠️ `sensor.pid_error`                       | Sensor (W)    | Difference between grid power and 0 W - shows how far the system is from balance.                                                     |
+| 🛠️ `binary_sensor.heater_active`            | Binary Sensor | Indicates if the heater is currently driven by the regulator.                                                                         |
+
+### Control Entities
+
+| Entity                             | Type   | Purpose                                                                                                                                                                                 |
+| ---------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🛠️ `switch.heater_enable`          | Switch | Enables or disables the heater entirely.                                                                                                                                                |
+| `switch.solar_router_bypass_relay` | Switch | Manually activates the bypass relay (normally automatic). Useful for testing.                                                                                                           |
+| `switch.solar_router_manual_mode`  | Switch | Enables or disables manual mode. When **ON**, you can manually set the heater load using `number.target_load_power_manual`. When **OFF**, the PID loop controls the load automatically. |
+
+### PID Tuning Entities
+
+| Entity          | Type   | Purpose                                                 |
+| --------------- | ------ | ------------------------------------------------------- |
+| `number.pid_Kp` | Number | Proportional gain - reacts to changes in grid power.    |
+| `number.pid_Ki` | Number | Integral gain - corrects steady-state errors over time. |
+| `number.pid_Kd` | Number | Derivative gain - dampens rapid changes in grid power.  |
+
+### Target Load Power Entities
+
+| Entity                                               | Type   | Purpose                                                                                                                                                                                                                                      |
+| ---------------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `number.solar_router_target_load_power_manual`       | Number | Sets the **target heater power manually**. When **Manual Mode** is active, the controller will route this exact power to the load, bypassing the PID automatic control. Useful for testing or calibration.                                   |
+| `number.solar_router_target_load_power_max_setpoint` | Number | Defines the **maximum allowed heater power** for automatic control. The PID loop will never exceed this value when adjusting the load. Also used to determine when the **bypass relay** should engage if solar surplus exceeds this maximum. |
+
+### Diagnostic Entities
+
+| Entity                                           | Type          | Purpose                                                        |
+| ------------------------------------------------ | ------------- | -------------------------------------------------------------- |
+| `binary_sensor.solar_router_solar_router_status` | Binary Sensor | ESP32 online status - "Verbonden" means connected.             |
+| `sensor.solar_router_solar_router_uptime`        | Sensor        | Shows how long the ESP32 has been running (e.g., `189.432 s`). |
+| `sensor.solar_router_solar_router_version`       | Sensor        | Firmware version and build timestamp.                          |
+| `sensor.solar_router_solar_router_wifi_signal`   | Sensor        | Wi-Fi signal strength in dBm.                                  |
+| `sensor.solar_router_solar_router_wifi_ssid`     | Sensor        | Connected Wi-Fi SSID.                                          |
+| `sensor.solar_router_solar_router_wifi_bssid`    | Sensor        | Wi-Fi access point BSSID.                                      |
+| `sensor.solar_router_solar_router_wifi_ip`       | Sensor        | ESP32 current IP address.                                      |
 
 ---
 
@@ -239,13 +334,34 @@ This allows **real-time feedback** while adjusting the parameters.
 
 ## Hardware
 
-| Component             | Description               | Notes                                       |
-| --------------------- | ------------------------- | ------------------------------------------- |
-| **ESP32**             | Main controller           | Any ESP32 dev board                         |
-| **DAC (I²C)**         | 15-bit DAC, 0–10 V output | Controlling the voltage regulator           |
-| **Voltage regulator** | Accepts 0–10 V control    | Drives the heater                           |
-| **Heater load**       | Resistive element         | e.g. 2000 W @ 230 V                         |
-| **Bypass relay**      | GPIO 33                   | Engages full power when surplus ≥ max power |
+| Component                                                                                                                                                                        | Description                    | Notes                                                    | Required |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ | -------------------------------------------------------- | -------- |
+| [ESP32 Dev Board](https://www.espressif.com/en/products/devkits/esp32-devkitc)                                                                                                   | Main controller                | Any ESP32 dev board                                      | Yes      |
+| [DFRobot Gravity GP8211 DAC (I²C)](https://www.dfrobot.com/product-2757.html)                                                                                                    | 15-bit DAC Module (0–5V/0–10V) | Controls the voltage regulator                           | Yes      |
+| [LSA-H3P50YB AC Voltage Regulator](https://nl.aliexpress.com/item/32606780994.html?spm=a2g0o.order_list.order_list_main.126.1fab1802njlUdD&gatewayAdapt=glo2nld)                 | Single-phase AC 50A, 220V/380V | Accepts 0–10 V control and drives the heater             | Yes      |
+| [Resistive Heater](https://www.amazon.com/s?k=2000w+resistive+heater)                                                                                                            | Resistive load                 | e.g., 2000 W @ 230 V                                     | Yes      |
+| [1-Channel 30A Relay Module with Optocoupler](https://nl.aliexpress.com/item/1005005870389973.html?spm=a2g0o.order_list.order_list_main.114.1fab1802njlUdD&gatewayAdapt=glo2nld) | Bypass relay                   | Engages full power when surplus ≥ max power              | No       |
+| [KCD3 Rocker Switch](https://nl.aliexpress.com/item/4000847897284.html?spm=a2g0o.order_list.order_list_main.17.677779d20KnYlF&gatewayAdapt=glo2nld)                              | On/Off switch                  | Manual control for testing or bypass                     | No       |
+| [Project Box / Enclosure](https://nl.aliexpress.com/item/1005009144913907.html?spm=a2g0o.order_list.order_list_main.45.130a1802Ag3rko&gatewayAdapt=glo2nld)                      | Enclosure for electronics      | Choose appropriate size for your components              | No       |
+| [DS18B20 Temperature Sensor](https://nl.aliexpress.com/item/1005008071825088.html?spm=a2g0o.order_list.order_list_main.62.1fab1802njlUdD&gatewayAdapt=glo2nld)                   | Temperature measurement        | Monitor heat in the Project Box / Enclosure              | No       |
+| [PCB DIN 35 Rail Mounting Adapter](https://nl.aliexpress.com/item/1005006226938330.html?spm=a2g0o.order_list.order_list_main.74.1fab1802njlUdD&gatewayAdapt=glo2nld)             | Mount the DAC or other modules | Fits standard DIN rail                                   | No       |
+| [Universal Wiring Cable Connectors](https://nl.aliexpress.com/item/1005007267097360.html?spm=a2g0o.order_list.order_list_main.91.1fab1802njlUdD&gatewayAdapt=glo2nld)            | Electrical connections         | For safe wiring of modules                               | No       |
+| [AC Power Socket (Output)](https://nl.aliexpress.com/item/32946228553.html?spm=a2g0o.order_list.order_list_main.97.1fab1802njlUdD&gatewayAdapt=glo2nld)                          | Output powersocket             | Connect your heater                                      | No       |
+| [Voltage Regulator Heat Sink](https://nl.aliexpress.com/item/1005009155430670.html?spm=a2g0o.order_list.order_list_main.108.1fab1802njlUdD&gatewayAdapt=glo2nld)                 | Cooling                        | Required for heat dissipation of the AC regulator        | No       |
+| [1-Channel 30A Relay Module with Optocoupler](https://nl.aliexpress.com/item/1005005870389973.html?spm=a2g0o.order_list.order_list_main.114.1fab1802njlUdD&gatewayAdapt=glo2nld) | Optional relay                 | Engages full power when surplus ≥ max power              | No       |
+| [C14 Inlet Power Socket](#)                                                                                                                                                      | Input powersocket              | Pay attention, this one is max 2500 watt (250 VAC, 10 A) | No       |
+| [DIN Rail](https://nl.aliexpress.com/item/1005005467003334.html?spm=a2g0o.order_list.order_list_main.51.18751802YkthVQ&gatewayAdapt=glo2nld)                                     | Mounting rail                  | Standard 35 mm DIN                                       | No       |
+
+### Pinout
+
+| Pin     | Component / Function                | Description                                                           |
+| ------- | ----------------------------------- | --------------------------------------------------------------------- |
+| GPIO 4  | DS18B20 Temperature Sensor (1-Wire) | Measures temperature (optional, for monitoring heater or environment) |
+| GPIO 21 | I²C SDA                             | Data line for I²C bus (DAC communication)                             |
+| GPIO 22 | I²C SCL                             | Clock line for I²C bus (DAC communication)                            |
+| GPIO 33 | Bypass Relay                        | Engages full heater power when solar surplus exceeds max load         |
+
+### Wiring
 
 ---
 
@@ -354,27 +470,31 @@ mqtt_password: "YOUR_MQTT_PASSWORD"
 ota_password: "YOUR_OTA_PASSWORD"
 api_encryption_key: "YOUR_API_KEY"
 ```
-> [!IMPORTANT]
-> Never commit your secrets.yaml to a public repository.
+
+> [!IMPORTANT] Never commit your secrets.yaml to a public repository.
 
 ### 2. Add the Project to ESPHome Dashboard
 
-1. Open ESPHome Dashboard in your browser.  
-2. Click + NEW DEVICE → Manual upload or Create custom configuration.  
-3. Name your device (e.g., zero-grid).  
-4. Click Add YAML file and select your zero-grid.yaml.  
-5. Make sure zero-grid.h is in the same folder so ESPHome can include it automatically.
+1. Open ESPHome Dashboard in your browser.
+2. Click + NEW DEVICE → Manual upload or Create custom configuration.
+3. Name your device (e.g., zero-grid).
+4. Click Add YAML file and select your zero-grid.yaml.
+5. Make sure zero-grid.h is in the same folder so ESPHome can include it
+   automatically.
 
 ### 3. Build and Flash the Firmware
 
 1. In ESPHome Dashboard, click Install for your device.
 
 2. Choose a flashing method:
-    - Plug in via USB → recommended for first flash
-    - OTA → only if the device already has ESPHome firmware running
 
-3. ESPHome will build the firmware using your personal secrets.yaml and flash it to the ESP32.
+   - Plug in via USB → recommended for first flash
+   - OTA → only if the device already has ESPHome firmware running
+
+3. ESPHome will build the firmware using your personal secrets.yaml and flash it
+   to the ESP32.
 
 ### 4. Initial Setup in Home Assistant
 
- - After flashing the device will connect to your Wi-Fi and MQTT broker and you can add it to your Home Assistant instance.
+- After flashing the device will connect to your Wi-Fi and MQTT broker and you
+  can add it to your Home Assistant instance.
