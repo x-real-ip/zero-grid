@@ -1,5 +1,9 @@
 ---
 globals:
+  - id: routing_enabled
+    type: bool
+    restore_value: true
+    initial_value: "true"
 
   - id: target_load_power_max
     type: float
@@ -227,15 +231,30 @@ mqtt:
   discovery: false
 
 switch:
+  - platform: template
+    name: "Routing Enabled"
+    id: routing_enabled_switch
+    icon: mdi:power-plug
+    optimistic: true
+    restore_mode: "RESTORE_DEFAULT_ON"
+    turn_on_action:
+      - lambda: |-
+          id(routing_enabled) = true;
+          ESP_LOGI("router", "Routing enabled");
+    turn_off_action:
+      - lambda: |-
+          id(routing_enabled) = false;
+          ESP_LOGI("router", "Routing disabled");
+
   - platform: gpio
-    name: "Bypass relay"
+    name: "Bypass Relay"
     icon: mdi:arrow-u-down-left
     id: bypass_relay
     pin: GPIO33
     restore_mode: ALWAYS_OFF
 
   - platform: template
-    name: "Manual mode"
+    name: "Manual Mode"
     icon: mdi:cursor-pointer
     id: manual_mode_switch
     restore_mode: "RESTORE_DEFAULT_OFF"
@@ -346,38 +365,42 @@ interval:
           if (isnan(id(pid_integral))) id(pid_integral) = 0.0;
           if (isnan(id(pid_error_prev))) id(pid_error_prev) = 0.0;
 
-          if (!id(manual_mode)) {
-            id(pid_load_power) = pid_target_load_power(
-                id(grid_power),
+          if (!id(manual_mode) && id(routing_enabled)) {
+              id(pid_load_power) = pid_target_load_power(
+                  id(grid_power),
+                  id(pid_load_power),
+                  id(target_load_power_max),
+                  id(pid_Kp).state,
+                  id(pid_Ki).state,
+                  id(pid_Kd).state,
+                  id(pid_dt),
+                  id(pid_integral),
+                  id(pid_error_prev)
+              );
+
+              // Send PID result to DAC
+              route_power_to_load(
+                id(i2cbus),
+                id(dac_addr_reg),
                 id(pid_load_power),
                 id(target_load_power_max),
-                id(pid_Kp).state,
-                id(pid_Ki).state,
-                id(pid_Kd).state,
-                id(pid_dt),
-                id(pid_integral),
-                id(pid_error_prev)
-            );
+                id(load_resistance),
+                id(grid_voltage).state
+              );
 
-            // Send PID result to DAC
-            route_power_to_load(
-              id(i2cbus),
-              id(dac_addr_reg),
-              id(pid_load_power),
-              id(target_load_power_max),
-              id(load_resistance),
-              id(grid_voltage).state
-            );
-
-            // Bypass Relay automatic control
-            float surplus = -id(grid_power);
-            if (surplus < 0.0f) surplus = 0.0f;
-            float max_power = id(target_load_power_max);
-            if (surplus >= max_power) {
-              id(bypass_relay).turn_on();
-              ESP_LOGI("bypass", "Bypass ON (%.0f W surplus >= %.0f W max)", surplus, max_power);
-            } else {
+              // Bypass Relay automatic control
+              float surplus = -id(grid_power);
+              if (surplus < 0.0f) surplus = 0.0f;
+              float max_power = id(target_load_power_max);
+              if (surplus >= max_power) {
+                id(bypass_relay).turn_on();
+                ESP_LOGI("bypass", "Bypass ON (%.0f W surplus >= %.0f W max)", surplus, max_power);
+              } else {
+                id(bypass_relay).turn_off();
+                ESP_LOGI("bypass", "Bypass OFF (%.0f W surplus < %.0f W max)", surplus, max_power);
+              }
+          } else {
+              // If routing disabled, make sure DAC output is zero and bypass off
+              dac_set_voltage(id(i2cbus), id(dac_addr_reg), 0.0);
               id(bypass_relay).turn_off();
-              ESP_LOGI("bypass", "Bypass OFF (%.0f W surplus < %.0f W max)", surplus, max_power);
-            }
           }
