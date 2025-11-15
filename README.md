@@ -214,6 +214,7 @@ Below is an overview of all entities and what they are used for.
 | `sensor.solar_router_grid_power`            | Sensor (W)    | Real-time grid import/export. Positive = consumption, negative = export. This is the primary PID input.                               |
 | `sensor.solar_router_pid_load_power`        | Sensor (W)    | The PID output calculated power currently being sent to the heater.                                                                   |
 | `sensor.solar_router_temperature`           | Sensor (°C)   | Measures temperature via the DS18B20 sensor. Can be used to monitor heater, water, or ambient temperature for diagnostics or logging. |
+| `sensor.routed_load_power_calculated`       | Sensor (W)    | Estimated real power currently routed to the load. Calculated using grid voltage, load resistance, and DAC output fraction.           |
 | 🛠️ `sensor.pid_error`                       | Sensor (W)    | Difference between grid power and 0 W - shows how far the system is from balance.                                                     |
 | 🛠️ `binary_sensor.heater_active`            | Binary Sensor | Indicates if the heater is currently driven by the regulator.                                                                         |
 
