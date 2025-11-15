@@ -36,7 +36,7 @@ globals:
   - id: load_resistance
     type: float
     restore_value: true
-    initial_value: "0.0"
+    initial_value: "100.0"
 
   - id: manual_mode
     type: bool
@@ -303,10 +303,10 @@ number:
     restore_value: true
 
   - platform: template
-    name: "Load Resistance"
-    id: load_resistance_number
+    name: "Load Resistance Setpoint"
+    id: load_resistance_setpoint
     unit_of_measurement: "Ω"
-    min_value: 10.0
+    min_value: 17.41 # 3680W at 253V
     max_value: 100.0
     step: 0.1
     optimistic: true
@@ -317,7 +317,7 @@ number:
           ESP_LOGI("config", "Load resistance set to %.2f Ω", x);
 
   - platform: template
-    name: "Target load power max setpoint"
+    name: "Target Load Power Max Setpoint"
     id: target_load_power_max_setpoint
     min_value: 0
     max_value: 3680
@@ -330,7 +330,7 @@ number:
           ESP_LOGI("router", "Max load power set to %.0f W", x);
 
   - platform: template
-    name: "Target load power manual"
+    name: "Target Load Power Manual"
     icon: mdi:lightning-bolt
     id: target_load_power_manual
     min_value: 0
