@@ -211,6 +211,25 @@ sensor:
       // Return the value of the global variable
       return id(pid_load_power);
 
+  - platform: template
+    name: "Routed Load Power (Calculated)"
+    id: routed_load_power_calc
+    unit_of_measurement: "W"
+    icon: mdi:heat-wave
+    update_interval: 1s
+    lambda: |-
+      float R = id(target_load_resistance);
+      float V = id(grid_voltage).state;
+      if (R <= 0 || isnan(V)) return 0;
+
+      // P = V^2 / R  but scaled by PWM/DAC fraction:
+      float fraction = id(pid_load_power) / id(target_load_power_max);
+      if (fraction < 0) fraction = 0;
+      if (fraction > 1) fraction = 1;
+
+      float max_power = (V * V) / R;
+      return max_power * fraction;
+
 one_wire:
   - platform: gpio
     pin: 4
