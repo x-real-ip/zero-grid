@@ -316,7 +316,7 @@ number:
     mode: box
 
   - platform: template
-    name: "Load Resistance Setpoint"
+    name: "Target Load Resistance Setpoint"
     id: target_load_resistance_setpoint
     unit_of_measurement: "Ω"
     min_value: 17.41 # 3680W at 253V
@@ -418,8 +418,7 @@ interval:
                 id(bypass_relay).turn_off();
                 ESP_LOGI("bypass", "Bypass OFF (%.0f W surplus < %.0f W max)", surplus, max_power);
               }
-          } else {
-              // If routing disabled, make sure DAC output is zero and bypass off
+          } else if (!id(manual_mode) && !id(routing_enabled)) {
               dac_set_voltage(id(i2cbus), id(dac_addr_reg), 0.0);
               id(bypass_relay).turn_off();
           }
