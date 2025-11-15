@@ -36,6 +36,9 @@ readings.
         - [Start with only **Kp**](#start-with-only-kp)
         - [Add **Ki** to remove steady-state error](#add-ki-to-remove-steady-state-error)
         - [Add **Kd** (optional)](#add-kd-optional)
+      - [Anti-Windup](#anti-windup)
+        - [Lower Limit: **–300**](#lower-limit-300)
+        - [Upper Limit: **+3000**](#upper-limit-3000)
       - [Live Monitoring](#live-monitoring)
       - [Goal](#goal)
   - [Hardware](#hardware)
@@ -210,7 +213,6 @@ Below is an overview of all entities and what they are used for.
 | ------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | `sensor.solar_router_grid_power`            | Sensor (W)    | Real-time grid import/export. Positive = consumption, negative = export. This is the primary PID input.                               |
 | `sensor.solar_router_pid_load_power`        | Sensor (W)    | The PID output calculated power currently being sent to the heater.                                                                   |
-| `sensor.solar_router_target_load_power_max` | Sensor (W)    | The maximum power that can be send to the heater (set by ).                                                                           |
 | `sensor.solar_router_temperature`           | Sensor (°C)   | Measures temperature via the DS18B20 sensor. Can be used to monitor heater, water, or ambient temperature for diagnostics or logging. |
 | 🛠️ `sensor.pid_error`                       | Sensor (W)    | Difference between grid power and 0 W - shows how far the system is from balance.                                                     |
 | 🛠️ `binary_sensor.heater_active`            | Binary Sensor | Indicates if the heater is currently driven by the regulator.                                                                         |
@@ -314,6 +316,39 @@ Start with these recommended baseline values:
 
 - Use **Kd** to reduce oscillations during rapid solar changes.
 - Too high **Kd** makes the system slow or unresponsive.
+
+#### Anti-Windup
+
+The PID controller includes an **anti-windup mechanism** to keep the system stable and prevent overshoot.  
+Windup occurs when the **integral term** keeps accumulating error even when the heater output is already at its limit.  
+This can cause:
+
+- large overshoots  
+- slow recovery  
+- oscillations in grid import/export  
+- unstable or noisy heater output  
+
+To prevent this, the integral value is **clamped** between **–300** and **+3000**.
+
+##### Lower Limit: **–300**
+A negative integral is important when the system temporarily overshoots (grid import).  
+Allowing the integral to go slightly negative:
+
+- speeds up correction  
+- prevents sluggish response  
+- reduces oscillation  
+
+The limit of **–300** provides enough negative authority without making the system unstable.
+
+##### Upper Limit: **+3000**
+During strong solar production the heater may run at full power.  
+Without an upper bound, the integral would continue growing, causing:
+
+- slow reaction when surplus drops  
+- grid import spikes  
+- oscillation around 0 W  
+
+The **+3000** limit prevents excessive integral buildup while keeping the controller responsive and smooth.
 
 #### Live Monitoring
 
