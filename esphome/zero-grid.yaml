@@ -270,6 +270,7 @@ number:
     step: 0.01
     initial_value: 0.1
     restore_value: true
+    mode: box
 
   - platform: template
     name: "PID Ki"
@@ -281,6 +282,7 @@ number:
     step: 0.01
     initial_value: 0.3
     restore_value: true
+    mode: box
 
   - platform: template
     name: "PID Kd"
@@ -292,6 +294,7 @@ number:
     step: 0.01
     initial_value: 0.05
     restore_value: true
+    mode: box
 
   - platform: template
     name: "Load Resistance Setpoint"
@@ -302,6 +305,7 @@ number:
     step: 0.01
     optimistic: true
     restore_value: true
+    mode: box
     set_action:
       - lambda: |-
           id(target_load_resistance) = x;
@@ -316,6 +320,7 @@ number:
     step: 1
     optimistic: true
     restore_value: true
+    mode: box
     set_action:
       - lambda: |-
           id(target_load_power_max) = x;
@@ -329,6 +334,7 @@ number:
     max_value: 3680
     step: 1
     optimistic: true
+    mode: box
     set_action:
       - lambda: |-
           float target_load_power_manual = x;
