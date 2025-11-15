@@ -209,14 +209,14 @@ Below is an overview of all entities and what they are used for.
 
 ### Power & Sensor Entities
 
-| Entity                                      | Type          | Purpose                                                                                                                               |
-| ------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `sensor.solar_router_grid_power`            | Sensor (W)    | Real-time grid import/export. Positive = consumption, negative = export. This is the primary PID input.                               |
-| `sensor.solar_router_pid_load_power`        | Sensor (W)    | The PID output calculated power currently being sent to the heater.                                                                   |
-| `sensor.solar_router_temperature`           | Sensor (°C)   | Measures temperature via the DS18B20 sensor. Can be used to monitor heater, water, or ambient temperature for diagnostics or logging. |
-| `sensor.routed_load_power_calculated`       | Sensor (W)    | Estimated real power currently routed to the load. Calculated using grid voltage, load resistance, and DAC output fraction.           |
-| 🛠️ `sensor.pid_error`                       | Sensor (W)    | Difference between grid power and 0 W - shows how far the system is from balance.                                                     |
-| 🛠️ `binary_sensor.heater_active`            | Binary Sensor | Indicates if the heater is currently driven by the regulator.                                                                         |
+| Entity                                | Type          | Purpose                                                                                                                               |
+| ------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `sensor.solar_router_grid_power`      | Sensor (W)    | Real-time grid import/export. Positive = consumption, negative = export. This is the primary PID input.                               |
+| `sensor.solar_router_pid_load_power`  | Sensor (W)    | The PID output calculated power currently being sent to the heater.                                                                   |
+| `sensor.solar_router_temperature`     | Sensor (°C)   | Measures temperature via the DS18B20 sensor. Can be used to monitor heater, water, or ambient temperature for diagnostics or logging. |
+| `sensor.routed_load_power_calculated` | Sensor (W)    | Estimated real power currently routed to the load. Calculated using grid voltage, load resistance, and DAC output fraction.           |
+| 🛠️ `sensor.pid_error`                 | Sensor (W)    | Difference between grid power and 0 W - shows how far the system is from balance.                                                     |
+| 🛠️ `binary_sensor.heater_active`      | Binary Sensor | Indicates if the heater is currently driven by the regulator.                                                                         |
 
 ### Control Entities
 
@@ -320,36 +320,44 @@ Start with these recommended baseline values:
 
 #### Anti-Windup
 
-The PID controller includes an **anti-windup mechanism** to keep the system stable and prevent overshoot.  
-Windup occurs when the **integral term** keeps accumulating error even when the heater output is already at its limit.  
+The PID controller includes an **anti-windup mechanism** to keep the system
+stable and prevent overshoot.  
+Windup occurs when the **integral term** keeps accumulating error even when the
+heater output is already at its limit.  
 This can cause:
 
-- large overshoots  
-- slow recovery  
-- oscillations in grid import/export  
-- unstable or noisy heater output  
+- large overshoots
+- slow recovery
+- oscillations in grid import/export
+- unstable or noisy heater output
 
-To prevent this, the integral value is **clamped** between **–300** and **+3000**.
+To prevent this, the integral value is **clamped** between **–300** and
+**+3000**.
 
 ##### Lower Limit: **–300**
-A negative integral is important when the system temporarily overshoots (grid import).  
+
+A negative integral is important when the system temporarily overshoots (grid
+import).  
 Allowing the integral to go slightly negative:
 
-- speeds up correction  
-- prevents sluggish response  
-- reduces oscillation  
+- speeds up correction
+- prevents sluggish response
+- reduces oscillation
 
-The limit of **–300** provides enough negative authority without making the system unstable.
+The limit of **–300** provides enough negative authority without making the
+system unstable.
 
 ##### Upper Limit: **+3000**
+
 During strong solar production the heater may run at full power.  
 Without an upper bound, the integral would continue growing, causing:
 
-- slow reaction when surplus drops  
-- grid import spikes  
-- oscillation around 0 W  
+- slow reaction when surplus drops
+- grid import spikes
+- oscillation around 0 W
 
-The **+3000** limit prevents excessive integral buildup while keeping the controller responsive and smooth.
+The **+3000** limit prevents excessive integral buildup while keeping the
+controller responsive and smooth.
 
 #### Live Monitoring
 
@@ -388,6 +396,8 @@ This allows **real-time feedback** while adjusting the parameters.
 | [1-Channel 30A Relay Module with Optocoupler](https://nl.aliexpress.com/item/1005005870389973.html?spm=a2g0o.order_list.order_list_main.114.1fab1802njlUdD&gatewayAdapt=glo2nld) | Optional relay                 | Engages full power when surplus ≥ max power              | No       |
 | [C14 Inlet Power Socket](#)                                                                                                                                                      | Input powersocket              | Pay attention, this one is max 2500 watt (250 VAC, 10 A) | No       |
 | [DIN Rail](https://nl.aliexpress.com/item/1005005467003334.html?spm=a2g0o.order_list.order_list_main.51.18751802YkthVQ&gatewayAdapt=glo2nld)                                     | Mounting rail                  | Standard 35 mm DIN                                       | No       |
+| [DIN Rail Power Supply 5V](https://www.tinytronics.nl/en/power/power-supplies/5v/yingjiao-din-rail-power-supply-5v-2.4a)                                                         | 5V Power Supply                | Provides stable power to ESP32, DAC, and sensors         | No       |
+| [Circuit Breaker](https://www.amazon.com/UL-489-Miniature-Circuit-Breaker-Non-Polarized/dp/B0FBWFCLNT/ref=sr_1_2?sr=8-2)                                                         | 13A/16A                        | Choose based on maximum heater load                      | No       |
 
 ### Pinout
 
@@ -508,7 +518,7 @@ ota_password: "YOUR_OTA_PASSWORD"
 api_encryption_key: "YOUR_API_KEY"
 ```
 
-> [!IMPORTANT] 
+> [!IMPORTANT]
 > Never commit your secrets.yaml to a public repository.
 
 ### 2. Add the Project to ESPHome Dashboard
