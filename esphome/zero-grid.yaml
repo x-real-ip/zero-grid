@@ -1,4 +1,10 @@
 ---
+substitutions:
+  device_name: "zero-grid"
+  device_comment:
+    "Routes surplus solar power to a heating element to heat water or for space
+    heating"
+
 api:
   encryption:
     key: !secret api_encryption_key
@@ -88,12 +94,6 @@ globals:
     restore_value: false
     initial_value: "0.0"
 
-substitutions:
-  device_name: "zero-grid"
-  device_comment:
-    "Routes surplus solar power to a heating element to heat water or for space
-    heating"
-
 esphome:
   name: ${device_name}
   comment: ${device_comment}
@@ -125,29 +125,29 @@ esp32:
 
 button:
   - platform: restart
-    name: ${device_name}_restart
+    name: Restart
 
 binary_sensor:
   - platform: status
-    name: ${device_name}_status
+    name: Status
 
 text_sensor:
   - platform: version
-    name: ${device_name}_version
+    name: Version
   - platform: wifi_info
     ip_address:
-      name: ${device_name}_wifi_ip
+      name: Wifi IP Address
     ssid:
-      name: ${device_name}_wifi_ssid
+      name: Wifi SSID
     bssid:
-      name: ${device_name}_wifi_bssid
+      name: Wifi BSSID
 
 sensor:
   - platform: uptime
-    name: ${device_name}_uptime
+    name: Uptime
 
   - platform: wifi_signal
-    name: ${device_name}_wifi_signal
+    name: Wifi Signal Strength
     id: wifi_signal_db
     update_interval: 60s
     entity_category: "diagnostic"
@@ -159,6 +159,7 @@ sensor:
 
   - platform: mqtt_subscribe
     id: grid_voltage
+    name: Grid Voltage
     topic: "dsmr/reading/phase_voltage_l1"
     unit_of_measurement: "V"
     internal: true
