@@ -223,7 +223,7 @@ sensor:
       float V = id(grid_voltage).state;
       if (R <= 0 || isnan(V)) return 0;
 
-      // P = V^2 / R  but scaled by PWM/DAC fraction:
+      // P = V^2 / R  but scaled by DAC fraction:
       float fraction = id(pid_load_power) / id(target_load_power_max);
       if (fraction < 0) fraction = 0;
       if (fraction > 1) fraction = 1;
