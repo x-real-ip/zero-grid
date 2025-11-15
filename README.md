@@ -412,7 +412,8 @@ This allows **real-time feedback** while adjusting the parameters.
 ### Wiring
 
 #### With Bypass
-![Wiring with bypass](docs/images/wiring-with-bypass.png)](https://app.cirkitdesigner.com/project/aa80dcf3-7fce-44a5-bc96-f0a5bf95a78f)
+![Wiring with bypass](docs/images/wiring-with-bypass.png)
+https://app.cirkitdesigner.com/project/aa80dcf3-7fce-44a5-bc96-f0a5bf95a78f
 
 
 
