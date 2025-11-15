@@ -299,7 +299,7 @@ number:
     unit_of_measurement: "Ω"
     min_value: 17.41 # 3680W at 253V
     max_value: 100.0
-    step: 0.1
+    step: 0.01
     optimistic: true
     restore_value: true
     set_action:
