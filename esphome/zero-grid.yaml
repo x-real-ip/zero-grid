@@ -319,10 +319,12 @@ number:
   - platform: template
     name: "Target Load Power Max Setpoint"
     id: target_load_power_max_setpoint
+    unit_of_measurement: "W"
     min_value: 0
     max_value: 3680
     step: 1
     optimistic: true
+    restore_value: true
     set_action:
       - lambda: |-
           id(target_load_power_max) = x;
