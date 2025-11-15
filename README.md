@@ -44,6 +44,7 @@ readings.
   - [Hardware](#hardware)
     - [Pinout](#pinout)
     - [Wiring](#wiring)
+      - [With Bypass](#with-bypass)
   - [MQTT Topics](#mqtt-topics)
   - [ESPHome Configuration](#esphome-configuration)
   - [Downsides and Considerations](#downsides-and-considerations)
@@ -409,6 +410,11 @@ This allows **real-time feedback** while adjusting the parameters.
 | GPIO 33 | Bypass Relay                        | Engages full heater power when solar surplus exceeds max load         |
 
 ### Wiring
+
+#### With Bypass
+![Wiring with bypass](docs/images/wiring-with-bypass.png)](https://app.cirkitdesigner.com/project/aa80dcf3-7fce-44a5-bc96-f0a5bf95a78f)
+
+
 
 ---
 
