@@ -202,15 +202,6 @@ sensor:
       return gridpower;
 
   - platform: template
-    name: "Target load power max"
-    icon: mdi:chart-bell-curve
-    id: target_load_power_max_sensor
-    unit_of_measurement: "W"
-    lambda: |-
-      // Return the value of the global variable
-      return id(target_load_power_max);
-
-  - platform: template
     name: "PID load power"
     icon: mdi:chart-bell-curve-cumulative
     id: pid_load_power_sensor
@@ -317,7 +308,7 @@ number:
           ESP_LOGI("config", "Load resistance set to %.2f Ω", x);
 
   - platform: template
-    name: "Target Load Power Max Setpoint"
+    name: "Target Load Power Max"
     id: target_load_power_max_setpoint
     unit_of_measurement: "W"
     min_value: 0
@@ -328,8 +319,7 @@ number:
     set_action:
       - lambda: |-
           id(target_load_power_max) = x;
-          id(target_load_power_max_sensor).publish_state(id(target_load_power_max));
-          ESP_LOGI("router", "Max load power set to %.0f W", x);
+          ESP_LOGI("router", "Target load power maximum set to %.0f W", x);
 
   - platform: template
     name: "Target Load Power Manual"
