@@ -1,4 +1,27 @@
 ---
+api:
+  encryption:
+    key: !secret api_encryption_key
+  reboot_timeout: "15min"
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  domain: !secret wifi_domain
+  ap:
+    ssid: ${device_name}_ap
+    password: !secret wifi_password
+
+mqtt:
+  broker: "mqtt.lan.stamx.nl"
+  username: !secret mqtt_user
+  password: !secret mqtt_password
+  discovery: false
+
 globals:
   - id: routing_enabled
     type: bool
@@ -10,10 +33,10 @@ globals:
     restore_value: true
     initial_value: "0.0"
 
-  - id: load_resistance
+  - id: target_load_resistance
     type: float
     restore_value: true
-    initial_value: "0.0"
+    initial_value: "100.0"
 
   - id: manual_mode
     type: bool
@@ -86,16 +109,7 @@ esphome:
 logger:
   level: DEBUG
 
-api:
-  encryption:
-    key: !secret api_encryption_key
-  reboot_timeout: "15min"
-
 captive_portal:
-
-ota:
-  - platform: esphome
-    password: !secret ota_password
 
 time:
   - platform: homeassistant
@@ -103,14 +117,6 @@ time:
 
 web_server:
   port: 80
-
-wifi:
-  ssid: !secret wifi_ssid
-  password: !secret wifi_password
-  domain: !secret wifi_domain
-  ap:
-    ssid: ${device_name}_ap
-    password: !secret wifi_password
 
 esp32:
   board: esp32dev
@@ -224,12 +230,6 @@ i2c:
   scan: true
   id: i2cbus
 
-mqtt:
-  broker: "mqtt.lan.stamx.nl"
-  username: !secret mqtt_user
-  password: !secret mqtt_password
-  discovery: false
-
 switch:
   - platform: template
     name: "Routing Enabled"
@@ -276,7 +276,7 @@ number:
     optimistic: true
     min_value: 0.0
     max_value: 5.0
-    step: 0.1
+    step: 0.01
     initial_value: 0.1
     restore_value: true
 
@@ -287,7 +287,7 @@ number:
     optimistic: true
     min_value: 0.0
     max_value: 0.5
-    step: 0.1
+    step: 0.01
     initial_value: 0.3
     restore_value: true
 
@@ -303,26 +303,28 @@ number:
     restore_value: true
 
   - platform: template
-    name: "Load Resistance"
-    id: load_resistance_number
+    name: "Load Resistance Setpoint"
+    id: target_load_resistance_setpoint
     unit_of_measurement: "Ω"
-    min_value: 10.0
+    min_value: 17.41 # 3680W at 253V
     max_value: 100.0
     step: 0.1
     optimistic: true
     restore_value: true
     set_action:
       - lambda: |-
-          id(load_resistance) = x;
+          id(target_load_resistance) = x;
           ESP_LOGI("config", "Load resistance set to %.2f Ω", x);
 
   - platform: template
-    name: "Target load power max setpoint"
+    name: "Target Load Power Max Setpoint"
     id: target_load_power_max_setpoint
+    unit_of_measurement: "W"
     min_value: 0
     max_value: 3680
     step: 1
     optimistic: true
+    restore_value: true
     set_action:
       - lambda: |-
           id(target_load_power_max) = x;
@@ -330,7 +332,7 @@ number:
           ESP_LOGI("router", "Max load power set to %.0f W", x);
 
   - platform: template
-    name: "Target load power manual"
+    name: "Target Load Power Manual"
     icon: mdi:lightning-bolt
     id: target_load_power_manual
     min_value: 0
@@ -346,7 +348,7 @@ number:
               id(dac_addr_reg),
               target_load_power_manual,
               id(target_load_power_max),
-              id(load_resistance),
+              id(target_load_resistance),
               id(grid_voltage).state
             );
           } else {
@@ -386,7 +388,7 @@ interval:
                 id(dac_addr_reg),
                 id(pid_load_power),
                 id(target_load_power_max),
-                id(load_resistance),
+                id(target_load_resistance),
                 id(grid_voltage).state
               );
 
