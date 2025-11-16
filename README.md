@@ -51,13 +51,13 @@ readings.
     - [Reference Table](#reference-table)
   - [MQTT Topics](#mqtt-topics)
   - [ESPHome Configuration](#esphome-configuration)
-  - [Downsides and Considerations](#downsides-and-considerations)
-    - [Harmonics](#harmonics)
   - [Installing](#installing)
     - [1. Prepare the Files](#1-prepare-the-files)
     - [2. Add the Project to ESPHome Dashboard](#2-add-the-project-to-esphome-dashboard)
     - [3. Build and Flash the Firmware](#3-build-and-flash-the-firmware)
     - [4. Initial Setup in Home Assistant](#4-initial-setup-in-home-assistant)
+  - [Downsides and Considerations](#downsides-and-considerations)
+    - [Harmonics](#harmonics)
 
 This project is based on ESPHome and **fully integrated with Home Assistant**
 
@@ -516,30 +516,6 @@ interval:
           );
 ```
 
-## Downsides and Considerations
-
-While this Zero-Grid system is highly effective for routing surplus solar power,
-there are a few important limitations and considerations:
-
-### Harmonics
-
-- When the voltage regulator **dims a resistive heater**, it does not provide a
-  perfectly smooth AC waveform.
-- This modulation can create **electrical harmonics** on your mains supply.
-- These harmonics can:
-  - Slightly distort the voltage waveform
-  - Potentially interfere with sensitive electronics
-  - Increase heating in wires or transformers in extreme cases
-  - **Cause audible buzzing or humming** from the heater, wiring, or voltage
-    regulator  
-    (common with phase-angle or waveform-modulated dimming)
-
-The buzzing sound becomes more noticeable at **partial load levels**, where the
-waveform is most distorted.
-
-Read more about harmonics here:
-https://en.wikipedia.org/wiki/Harmonics_(electrical_power)
-
 ## Installing
 
 Installing using Zero-Grid via ESPHome Dashboard
@@ -565,7 +541,7 @@ cd zero-grid/esphome
 - zero-grid.h
 - secrets.yaml
 
-Create a personal secrets.yaml file with your credentials:
+3. Create a personal secrets.yaml file with your credentials or change them directly in the `zero-grid.yaml`:
 
 ```yaml
 wifi_ssid: "YOUR_WIFI_SSID"
@@ -578,6 +554,22 @@ api_encryption_key: "YOUR_API_KEY"
 
 > [!IMPORTANT]
 > Never commit your secrets.yaml to a public repository.
+
+4. Update the MQTT topics in `zero-grid.yaml` to match your smart meter or Home Assistant configuration:
+
+```yaml
+- platform: mqtt_subscribe
+  id: grid_voltage
+  topic: "dsmr/reading/phase_voltage_l1"
+
+- platform: mqtt_subscribe
+  id: grid_power_returned_mqtt
+  topic: "dsmr/reading/electricity_currently_returned"
+
+- platform: mqtt_subscribe
+  id: grid_power_delivered_mqtt
+  topic: "dsmr/reading/electricity_currently_delivered"
+```
 
 ### 2. Add the Project to ESPHome Dashboard
 
@@ -604,3 +596,27 @@ api_encryption_key: "YOUR_API_KEY"
 
 - After flashing the device will connect to your Wi-Fi and MQTT broker and you
   can add it to your Home Assistant instance.
+
+## Downsides and Considerations
+
+While this Zero-Grid system is highly effective for routing surplus solar power,
+there are a few important limitations and considerations:
+
+### Harmonics
+
+- When the voltage regulator **dims a resistive heater**, it does not provide a
+  perfectly smooth AC waveform.
+- This modulation can create **electrical harmonics** on your mains supply.
+- These harmonics can:
+  - Slightly distort the voltage waveform
+  - Potentially interfere with sensitive electronics
+  - Increase heating in wires or transformers in extreme cases
+  - **Cause audible buzzing or humming** from the heater, wiring, or voltage
+    regulator  
+    (common with phase-angle or waveform-modulated dimming)
+
+The buzzing sound becomes more noticeable at **partial load levels**, where the
+waveform is most distorted.
+
+Read more about harmonics here:
+https://en.wikipedia.org/wiki/Harmonics_(electrical_power)
