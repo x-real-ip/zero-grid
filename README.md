@@ -6,8 +6,7 @@ Routes surplus solar power to a heating element using an ESP32. The goal: **keep
 grid power near 0 W** by dynamically adjusting heater load based on live grid
 readings.
 
-> [!CAUTION]
-> This project involves high-voltage AC and electronic circuits. You
+> [!CAUTION] This project involves high-voltage AC and electronic circuits. You
 > must have knowledge of electronics and safe handling of mains electricity.
 > Improper use can cause serious injury, death, or property damage. I am not
 > responsible for any damage, injury, or accidents resulting from the use of
@@ -45,6 +44,10 @@ readings.
     - [Pinout](#pinout)
     - [Wiring](#wiring)
       - [With Bypass](#with-bypass)
+  - [Determining the Resistance](#determining-the-resistance)
+    - [Method 1 - Measure With a Multimeter (Most Accurate)](#method-1---measure-with-a-multimeter-most-accurate)
+    - [Method 2 - Calculate Resistance From Heater Label](#method-2---calculate-resistance-from-heater-label)
+    - [Reference Table](#reference-table)
   - [MQTT Topics](#mqtt-topics)
   - [ESPHome Configuration](#esphome-configuration)
   - [Downsides and Considerations](#downsides-and-considerations)
@@ -411,10 +414,58 @@ This allows **real-time feedback** while adjusting the parameters.
 ### Wiring
 
 #### With Bypass
+
 ![Wiring with bypass](docs/images/wiring-with-bypass.png)
 https://app.cirkitdesigner.com/project/aa80dcf3-7fce-44a5-bc96-f0a5bf95a78f
 
+---
 
+## Determining the Resistance
+
+To accurately calculate how much power your heater can consume at different DAC
+output levels, the system must know the **electrical resistance (Ω)** of your
+heating element.
+
+There are **two ways** to determine this value.
+
+### Method 1 - Measure With a Multimeter (Most Accurate)
+
+> [!WARNING] Always disconnect the heater from mains power before performing
+> measurements.
+
+**Steps:**
+
+1. Unplug the heater completely.
+2. Set your multimeter to **Ω (resistance)** mode.
+3. Touch the probes to the two plug terminals:
+   - Probe 1 → pin 1
+   - Probe 2 → pin 2
+4. Read the resistance value (typically **20–60 Ω** for 1000–3000 W heaters).
+
+### Method 2 - Calculate Resistance From Heater Label
+
+If you don’t have a multimeter, compute resistance using the printed power
+rating.
+
+Formula: Resistance = Voltage² / Power
+
+**Example:**
+
+Heater label: 2000 W @ 230 V  
+Then: Resistance = 230² / 2000 ≈ 26.45 Ω
+
+### Reference Table
+
+| Heater Power (W) | Voltage (V) | Resistance (Ω) |
+| ---------------- | ----------- | -------------- |
+| 500 W            | 230 V       | 105.8 Ω        |
+| 1000 W           | 230 V       | 52.9 Ω         |
+| 1500 W           | 230 V       | 35.3 Ω         |
+| 2000 W           | 230 V       | 26.5 Ω         |
+| 2500 W           | 230 V       | 21.2 Ω         |
+| 3000 W           | 230 V       | 17.6 Ω         |
+
+Use this value in: `number.zero_grid_target_load_resistance_setpoint`
 
 ---
 
@@ -524,8 +575,7 @@ ota_password: "YOUR_OTA_PASSWORD"
 api_encryption_key: "YOUR_API_KEY"
 ```
 
-> [!IMPORTANT]
-> Never commit your secrets.yaml to a public repository.
+> [!IMPORTANT] Never commit your secrets.yaml to a public repository.
 
 ### 2. Add the Project to ESPHome Dashboard
 
