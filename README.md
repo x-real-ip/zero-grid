@@ -210,49 +210,48 @@ Below is an overview of all entities and what they are used for.
 
 ### Power & Sensor Entities
 
-| Entity                                | Type          | Purpose                                                                                                                               |
-| ------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `sensor.solar_router_grid_power`      | Sensor (W)    | Real-time grid import/export. Positive = consumption, negative = export. This is the primary PID input.                               |
-| `sensor.solar_router_pid_load_power`  | Sensor (W)    | The PID output calculated power currently being sent to the heater.                                                                   |
-| `sensor.solar_router_temperature`     | Sensor (°C)   | Measures temperature via the DS18B20 sensor. Can be used to monitor heater, water, or ambient temperature for diagnostics or logging. |
-| `sensor.routed_load_power_calculated` | Sensor (W)    | Estimated real power currently routed to the load. Calculated using grid voltage, load resistance, and DAC output fraction.           |
-| 🛠️ `sensor.pid_error`                 | Sensor (W)    | Difference between grid power and 0 W - shows how far the system is from balance.                                                     |
-| 🛠️ `binary_sensor.heater_active`      | Binary Sensor | Indicates if the heater is currently driven by the regulator.                                                                         |
+| Entity                                | Type        | Purpose                                                                                                                               |
+| ------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `sensor.solar_router_grid_power`      | Sensor (W)  | Real-time grid import/export. Positive = consumption, negative = export. This is the primary PID input.                               |
+| `sensor.solar_router_pid_load_power`  | Sensor (W)  | The PID output calculated power currently being sent to the heater.                                                                   |
+| `sensor.routed_load_power_calculated` | Sensor (W)  | Estimated real power currently routed to the load. Calculated using grid voltage, load resistance, and DAC output.                    |
+| `sensor.solar_router_temperature`     | Sensor (°C) | Measures temperature via the DS18B20 sensor. Can be used to monitor heater, water, or ambient temperature for diagnostics or logging. |
 
 ### Control Entities
 
 | Entity                             | Type   | Purpose                                                                                                                                                                                 |
 | ---------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 🛠️ `switch.heater_enable`          | Switch | Enables or disables the heater entirely.                                                                                                                                                |
-| `switch.solar_router_bypass_relay` | Switch | Manually activates the bypass relay (normally automatic). Useful for testing.                                                                                                           |
-| `switch.solar_router_manual_mode`  | Switch | Enables or disables manual mode. When **ON**, you can manually set the heater load using `number.target_load_power_manual`. When **OFF**, the PID loop controls the load automatically. |
+| `switch.zero_grid_bypass_relay`    | Switch | Manually activates the bypass relay (normally automatic). Useful for testing or to turn on the heater even if you don't produce solar power.                                            |
+| `switch.zero_grid_manual_mode`     | Switch | Enables or disables manual mode. When **ON**, you can manually set the heater load using `number.target_load_power_manual`. When **OFF**, the PID loop controls the load automatically. |
+| `switch.zero_grid_routing_enabled` | Switch | Enables or disables routing to the heater entirely.                                                                                                                                     |
 
 ### PID Tuning Entities
 
-| Entity          | Type   | Purpose                                                 |
-| --------------- | ------ | ------------------------------------------------------- |
-| `number.pid_Kp` | Number | Proportional gain - reacts to changes in grid power.    |
-| `number.pid_Ki` | Number | Integral gain - corrects steady-state errors over time. |
-| `number.pid_Kd` | Number | Derivative gain - dampens rapid changes in grid power.  |
+| Entity                    | Type   | Purpose                                                 |
+| ------------------------- | ------ | ------------------------------------------------------- |
+| `number.zero_grid_pid_Kp` | Number | Proportional gain - reacts to changes in grid power.    |
+| `number.zero_grid_pid_Ki` | Number | Integral gain - corrects steady-state errors over time. |
+| `number.zero_grid_pid_Kd` | Number | Derivative gain - dampens rapid changes in grid power.  |
 
 ### Target Load Power Entities
 
-| Entity                                               | Type   | Purpose                                                                                                                                                                                                                                      |
-| ---------------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `number.solar_router_target_load_power_manual`       | Number | Sets the **target heater power manually**. When **Manual Mode** is active, the controller will route this exact power to the load, bypassing the PID automatic control. Useful for testing or calibration.                                   |
-| `number.solar_router_target_load_power_max_setpoint` | Number | Defines the **maximum allowed heater power** for automatic control. The PID loop will never exceed this value when adjusting the load. Also used to determine when the **bypass relay** should engage if solar surplus exceeds this maximum. |
+| Entity                                             | Type   | Purpose                                                                                                                                                                                                                                                                                                                |
+| -------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `number.zero_grid_target_load_power_manual`        | Number | Sets the **target heater power manually**. When **Manual Mode** is active, the controller will route this exact power to the load, bypassing the PID automatic control. Useful for testing or calibration.                                                                                                             |
+| `number.zero_grid_target_load_power_max`           | Number | Defines the **maximum allowed heater power** for automatic control. The PID loop will never exceed this value when adjusting the load. Also used to determine when the **bypass relay** should engage if solar surplus exceeds this maximum.                                                                           |
+| `number.zero_grid_target_load_resistance_setpoint` | Number | Sets the **heater resistance value (in ohms)** used for power calculations. This allows the system to accurately convert PID output (requested power) into the correct DAC duty cycle based on your heater’s actual resistance. Adjust this if you change for your heating element or want more precise power control. |
 
 ### Diagnostic Entities
 
-| Entity                                           | Type          | Purpose                                                        |
-| ------------------------------------------------ | ------------- | -------------------------------------------------------------- |
-| `binary_sensor.solar_router_solar_router_status` | Binary Sensor | ESP32 online status - "Verbonden" means connected.             |
-| `sensor.solar_router_solar_router_uptime`        | Sensor        | Shows how long the ESP32 has been running (e.g., `189.432 s`). |
-| `sensor.solar_router_solar_router_version`       | Sensor        | Firmware version and build timestamp.                          |
-| `sensor.solar_router_solar_router_wifi_signal`   | Sensor        | Wi-Fi signal strength in dBm.                                  |
-| `sensor.solar_router_solar_router_wifi_ssid`     | Sensor        | Connected Wi-Fi SSID.                                          |
-| `sensor.solar_router_solar_router_wifi_bssid`    | Sensor        | Wi-Fi access point BSSID.                                      |
-| `sensor.solar_router_solar_router_wifi_ip`       | Sensor        | ESP32 current IP address.                                      |
+| Entity                           | Type          | Purpose                                                        |
+| -------------------------------- | ------------- | -------------------------------------------------------------- |
+| `binary_sensor.zero_grid_status` | Binary Sensor | ESP32 online status - "Verbonden" means connected.             |
+| `sensor.zero_grid_uptime`        | Sensor        | Shows how long the ESP32 has been running (e.g., `189.432 s`). |
+| `sensor.zero_grid_version`       | Sensor        | Firmware version and build timestamp.                          |
+| `sensor.zero_grid_wifi_signal`   | Sensor        | Wi-Fi signal strength in dBm.                                  |
+| `sensor.zero_grid_wifi_ssid`     | Sensor        | Connected Wi-Fi SSID.                                          |
+| `sensor.zero_grid_wifi_bssid`    | Sensor        | Wi-Fi access point BSSID.                                      |
+| `sensor.zero_grid_wifi_ip`       | Sensor        | ESP32 current IP address.                                      |
 
 ---
 
