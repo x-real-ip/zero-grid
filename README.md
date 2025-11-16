@@ -6,7 +6,8 @@ Routes surplus solar power to a heating element using an ESP32. The goal: **keep
 grid power near 0 W** by dynamically adjusting heater load based on live grid
 readings.
 
-> [!CAUTION] This project involves high-voltage AC and electronic circuits. You
+> [!CAUTION]
+> This project involves high-voltage AC and electronic circuits. You
 > must have knowledge of electronics and safe handling of mains electricity.
 > Improper use can cause serious injury, death, or property damage. I am not
 > responsible for any damage, injury, or accidents resulting from the use of
@@ -430,8 +431,8 @@ There are **two ways** to determine this value.
 
 ### Method 1 - Measure With a Multimeter (Most Accurate)
 
-> [!WARNING] Always disconnect the heater from mains power before performing
-> measurements.
+> [!WARNING]
+> Always disconnect the heater from mains power before performing measurements.
 
 **Steps:**
 
@@ -575,7 +576,8 @@ ota_password: "YOUR_OTA_PASSWORD"
 api_encryption_key: "YOUR_API_KEY"
 ```
 
-> [!IMPORTANT] Never commit your secrets.yaml to a public repository.
+> [!IMPORTANT]
+> Never commit your secrets.yaml to a public repository.
 
 ### 2. Add the Project to ESPHome Dashboard
 
