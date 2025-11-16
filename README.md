@@ -51,13 +51,13 @@ readings.
     - [Reference Table](#reference-table)
   - [MQTT Topics](#mqtt-topics)
   - [ESPHome Configuration](#esphome-configuration)
-  - [Downsides and Considerations](#downsides-and-considerations)
-    - [Harmonics](#harmonics)
   - [Installing](#installing)
     - [1. Prepare the Files](#1-prepare-the-files)
     - [2. Add the Project to ESPHome Dashboard](#2-add-the-project-to-esphome-dashboard)
     - [3. Build and Flash the Firmware](#3-build-and-flash-the-firmware)
     - [4. Initial Setup in Home Assistant](#4-initial-setup-in-home-assistant)
+  - [Downsides and Considerations](#downsides-and-considerations)
+    - [Harmonics](#harmonics)
 
 This project is based on ESPHome and **fully integrated with Home Assistant**
 
@@ -516,6 +516,82 @@ interval:
           );
 ```
 
+## Installing
+
+Installing using Zero-Grid via ESPHome Dashboard
+
+Because the firmware contains **personal secrets** (Wi-Fi, MQTT, OTA), users
+must **build the firmware locally** using their own credentials. Prebuilt `.bin`
+files cannot be used directly.
+
+The next steps explains how to safely install Zero-Grid.
+
+### 1. Prepare the Files
+
+1. Download the latest release https://github.com/x-real-ip/zero-grid/releases/latest
+
+2. Ensure the following files are in your ESPHome project folder, you can find them in the `esphome` folder:
+
+- zero-grid.yaml
+- zero-grid.h
+- secrets.yaml
+
+3. Create a personal secrets.yaml file with your credentials or add them directly in the `zero-grid.yaml`:
+
+```yaml
+wifi_ssid: "YOUR_WIFI_SSID"
+wifi_password: "YOUR_WIFI_PASSWORD"
+mqtt_user: "YOUR_MQTT_USER"
+mqtt_password: "YOUR_MQTT_PASSWORD"
+ota_password: "YOUR_OTA_PASSWORD"
+api_encryption_key: "YOUR_API_KEY"
+```
+
+> [!IMPORTANT]
+> Never commit your `secrets.yaml` or `zero-grid.yaml` containing secrets to a public repository.
+
+4. Update the MQTT topics in `zero-grid.yaml` to match your smart meter or Home Assistant configuration:
+
+```yaml
+- platform: mqtt_subscribe
+  id: grid_voltage
+  topic: "dsmr/reading/phase_voltage_l1"
+
+- platform: mqtt_subscribe
+  id: grid_power_returned_mqtt
+  topic: "dsmr/reading/electricity_currently_returned"
+
+- platform: mqtt_subscribe
+  id: grid_power_delivered_mqtt
+  topic: "dsmr/reading/electricity_currently_delivered"
+```
+
+### 2. Add the Project to ESPHome Dashboard
+
+1. Open ESPHome Dashboard in your browser.
+2. Click + NEW DEVICE -> Manual upload or Create custom configuration.
+3. Name your device (e.g., zero-grid).
+4. Click Add YAML file and select your zero-grid.yaml.
+5. Make sure zero-grid.h is in the same folder so ESPHome can include it
+   automatically.
+
+### 3. Build and Flash the Firmware
+
+1. In ESPHome Dashboard, click Install for your device.
+
+2. Choose a flashing method:
+
+   - Plug in via USB -> recommended for first flash
+   - OTA -> only if the device already has ESPHome firmware running
+
+3. ESPHome will build the firmware using your personal secrets.yaml and flash it
+   to the ESP32.
+
+### 4. Initial Setup in Home Assistant
+
+- After flashing the device will connect to your Wi-Fi and MQTT broker and you
+  can add it to your Home Assistant instance.
+
 ## Downsides and Considerations
 
 While this Zero-Grid system is highly effective for routing surplus solar power,
@@ -539,68 +615,3 @@ waveform is most distorted.
 
 Read more about harmonics here:
 https://en.wikipedia.org/wiki/Harmonics_(electrical_power)
-
-## Installing
-
-Installing using Zero-Grid via ESPHome Dashboard
-
-Because the firmware contains **personal secrets** (Wi-Fi, MQTT, OTA), users
-must **build the firmware locally** using their own credentials. Prebuilt `.bin`
-files cannot be used directly.
-
-The next steps explains how to safely install Zero-Grid.
-
-### 1. Prepare the Files
-
-1. Clone or download the repository:
-
-```bash
-git clone https://github.com/x-real-ip/zero-grid.git
-cd zero-grid/esphome
-```
-
-2. Ensure the following files are in your ESPHome project folder:
-
-- zero-grid.yaml
-- zero-grid.h
-- secrets.yaml
-
-Create a personal secrets.yaml file with your credentials:
-
-```yaml
-wifi_ssid: "YOUR_WIFI_SSID"
-wifi_password: "YOUR_WIFI_PASSWORD"
-mqtt_user: "YOUR_MQTT_USER"
-mqtt_password: "YOUR_MQTT_PASSWORD"
-ota_password: "YOUR_OTA_PASSWORD"
-api_encryption_key: "YOUR_API_KEY"
-```
-
-> [!IMPORTANT]
-> Never commit your secrets.yaml to a public repository.
-
-### 2. Add the Project to ESPHome Dashboard
-
-1. Open ESPHome Dashboard in your browser.
-2. Click + NEW DEVICE → Manual upload or Create custom configuration.
-3. Name your device (e.g., zero-grid).
-4. Click Add YAML file and select your zero-grid.yaml.
-5. Make sure zero-grid.h is in the same folder so ESPHome can include it
-   automatically.
-
-### 3. Build and Flash the Firmware
-
-1. In ESPHome Dashboard, click Install for your device.
-
-2. Choose a flashing method:
-
-   - Plug in via USB → recommended for first flash
-   - OTA → only if the device already has ESPHome firmware running
-
-3. ESPHome will build the firmware using your personal secrets.yaml and flash it
-   to the ESP32.
-
-### 4. Initial Setup in Home Assistant
-
-- After flashing the device will connect to your Wi-Fi and MQTT broker and you
-  can add it to your Home Assistant instance.
