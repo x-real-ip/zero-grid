@@ -528,20 +528,15 @@ The next steps explains how to safely install Zero-Grid.
 
 ### 1. Prepare the Files
 
-1. Clone or download the repository:
+1. Download the latest release https://github.com/x-real-ip/zero-grid/releases/latest
 
-```bash
-git clone https://github.com/x-real-ip/zero-grid.git
-cd zero-grid/esphome
-```
-
-2. Ensure the following files are in your ESPHome project folder:
+2. Ensure the following files are in your ESPHome project folder, you can find them in the `esphome` folder:
 
 - zero-grid.yaml
 - zero-grid.h
 - secrets.yaml
 
-3. Create a personal secrets.yaml file with your credentials or change them directly in the `zero-grid.yaml`:
+3. Create a personal secrets.yaml file with your credentials or add them directly in the `zero-grid.yaml`:
 
 ```yaml
 wifi_ssid: "YOUR_WIFI_SSID"
@@ -553,7 +548,7 @@ api_encryption_key: "YOUR_API_KEY"
 ```
 
 > [!IMPORTANT]
-> Never commit your secrets.yaml to a public repository.
+> Never commit your `secrets.yaml` or `zero-grid.yaml` containing secrets to a public repository.
 
 4. Update the MQTT topics in `zero-grid.yaml` to match your smart meter or Home Assistant configuration:
 
@@ -574,7 +569,7 @@ api_encryption_key: "YOUR_API_KEY"
 ### 2. Add the Project to ESPHome Dashboard
 
 1. Open ESPHome Dashboard in your browser.
-2. Click + NEW DEVICE → Manual upload or Create custom configuration.
+2. Click + NEW DEVICE -> Manual upload or Create custom configuration.
 3. Name your device (e.g., zero-grid).
 4. Click Add YAML file and select your zero-grid.yaml.
 5. Make sure zero-grid.h is in the same folder so ESPHome can include it
@@ -586,8 +581,8 @@ api_encryption_key: "YOUR_API_KEY"
 
 2. Choose a flashing method:
 
-   - Plug in via USB → recommended for first flash
-   - OTA → only if the device already has ESPHome firmware running
+   - Plug in via USB -> recommended for first flash
+   - OTA -> only if the device already has ESPHome firmware running
 
 3. ESPHome will build the firmware using your personal secrets.yaml and flash it
    to the ESP32.
