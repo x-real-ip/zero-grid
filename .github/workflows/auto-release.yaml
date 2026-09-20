@@ -15,7 +15,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Prepare secrets file
         run: mv esphome/secrets.yaml.example esphome/secrets.yaml
