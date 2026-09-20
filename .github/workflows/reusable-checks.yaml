@@ -7,7 +7,7 @@ on:
 jobs:
   yamllint:
     name: Yaml lint
-    uses: x-real-ip/github-actions/.github/workflows/yamllint.yaml@main
+    uses: x-real-ip/github-actions/.github/workflows/yamllint.yaml@v3
 
   test_configs:
     name: Test configs with ESPHome
