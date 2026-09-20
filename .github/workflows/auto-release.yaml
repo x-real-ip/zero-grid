@@ -39,7 +39,7 @@ jobs:
           mv esphome/zero-grid.h zero-grid-esp32/zero-grid-esp32-${VERSION}.h
 
       - name: Upload firmware assets
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           draft: false
           tag_name: ${{ github.ref_name }}
